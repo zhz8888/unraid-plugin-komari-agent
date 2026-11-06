@@ -187,7 +187,7 @@ PY
   # as one flat file with that literal name, so nothing lands in /etc and the
   # plugin installs "successfully" while doing nothing. Building the archive on
   # Windows used to produce exactly that, so this is checked explicitly.
-  "${PYTHON}" - "${TXZ}" <<'PY'
+  if "${PYTHON}" - "${TXZ}" <<'PY'
 import sys
 import tarfile
 
@@ -217,7 +217,7 @@ for name in names:
 
 print("OK %d members, all POSIX relative paths" % len(names))
 PY
-  if [ $? -eq 0 ]; then
+  then
     ok "archive member names are POSIX paths"
   else
     bad "archive member names are not POSIX paths"; FAIL=1
@@ -275,7 +275,7 @@ PY
   #    of runtime scripts that are not executable on the Unraid host. The
   #    build applies a manifest; this asserts that it took effect.
   log "checking the archive file modes..."
-  "${PYTHON}" - "${TXZ}" <<'PY'
+  if "${PYTHON}" - "${TXZ}" <<'PY'
 import sys
 import tarfile
 
@@ -324,7 +324,7 @@ if problems:
 print("OK %d files, %d of them executable" %
       (len(members), sum(1 for m in members.values() if m.mode & 0o111)))
 PY
-  if [ $? -eq 0 ]; then
+  then
     ok "archive file modes are correct"
   else
     bad "archive file modes are wrong"; FAIL=1
@@ -439,7 +439,7 @@ PY
   log "checking the Community Applications wrapper..."
   CA_XML="${REPO_ROOT}/ca/${PLUGIN_NAME}.xml"
   if [ -f "${CA_XML}" ]; then
-    "${PYTHON}" - "${PLGS[0]}" "${CA_XML}" <<'PY'
+    if "${PYTHON}" - "${PLGS[0]}" "${CA_XML}" <<'PY'
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -465,7 +465,7 @@ if plg_url != ca_url:
 
 print("OK %s" % ca_url)
 PY
-    if [ $? -eq 0 ]; then
+    then
       ok "the CA wrapper names the same pluginURL as the .plg"
     else
       bad "the CA wrapper and the .plg disagree about pluginURL"; FAIL=1
