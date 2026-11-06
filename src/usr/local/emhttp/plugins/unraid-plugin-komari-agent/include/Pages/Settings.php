@@ -11,7 +11,10 @@
  *   #file     the file to write, relative to /boot/config/plugins/
  *   #cleanup  omit keys whose value is empty instead of writing KEY=""
  *   #command  run this after saving; its output is streamed to the progress
- *             frame, so the restart is visible to the user
+ *             frame, so the restart is visible to the user. It is apply.sh,
+ *             the documented "save and apply" entry point, which delegates to
+ *             restart.sh; naming restart.sh here would leave apply.sh shipped
+ *             but unreachable.
  *
  * /update.php writes every posted key as KEY="value" into a flat INI file, and
  * keys that are already in the file but not posted keep their old value. That
@@ -29,7 +32,7 @@ $configured = komari_cfg_is_configured();
 $restartScript = komari_script_path('restart.sh');
 
 $actionEndpoint = '/plugins/' . KOMARI_PLUGIN_NAME . '/include/data/Action.php';
-$restartCommand = KOMARI_SCRIPTS . '/restart.sh';
+$restartCommand = KOMARI_SCRIPTS . '/apply.sh';
 
 $preferOptions = array(
     '' => 'Automatic',
