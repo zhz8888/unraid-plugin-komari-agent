@@ -180,14 +180,8 @@ STATUS="${FAKE}/usr/local/emhttp/plugins/${PLUGIN_NAME}/scripts/status.sh"
 # The supervisor is started with its output redirected to the log, but it
 # still holds the pipe this script's stdout may point at. Reading a command's
 # output through $( ) or a redirect would therefore block until the supervisor
-# exits, which is never. Every invocation below is written to a file and the
-# file is read afterwards, and the script itself is run with its stdout on a
-# file rather than a pipe.
-run_to_file() {
-  local out="$1"
-  shift
-  "$@" >"${out}" 2>&1 </dev/null
-}
+# exits, which is never. Every invocation below is therefore written to a file
+# with its stdout on a file rather than a pipe.
 
 if [ -f "${START}" ]; then
   if bash "${START}" >"${WORK}/start.log" 2>&1 </dev/null; then
