@@ -14,6 +14,21 @@ name: build
 # No logic is inlined. Every step calls a script from scripts/, and the same
 # commands are what CONTRIBUTING.md tells a contributor to run locally, so "it
 # passes locally" and "it passes in CI" are the same statement.
+#
+# Pinned versions
+#
+# The runner is pinned to ubuntu-24.04 rather than ubuntu-latest. The
+# ubuntu-latest label moves to Ubuntu 26.04 over the weeks from 2026-10-19, and
+# a moving label means the build environment can change under a commit that did
+# not. This package is assembled from bash, tar, Python and curl, and the
+# reproducibility checks compare the resulting bytes across rebuilds, so a silent
+# libc or tar upgrade is exactly the kind of change those checks would surface as
+# a mysterious hash mismatch. Pinning makes the environment a decision rather
+# than an accident; bump it deliberately, in its own commit.
+#
+# The action versions are the current majors, all of which run on node24. The
+# previous node20 versions still work but are deprecated and emit a warning on
+# every run.
 
 on:
   push:
@@ -44,7 +59,7 @@ concurrency:
 jobs:
   verify:
     name: Build and verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Three sources, in order of precedence:
       #
@@ -68,10 +83,10 @@ jobs:
       # Unraid is x86_64 only, so this is the only published architecture.
       KOMARI_ARCH: amd64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
 
@@ -185,7 +200,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           # Both files are uploaded, not just the package. The release job
           # publishes these exact bytes instead of rebuilding, so what was
@@ -203,12 +218,12 @@ jobs:
     name: Publish release
     needs: verify
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - name: Download the verified artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: unraid-plugin-komari-agent
           path: dist
@@ -257,7 +272,7 @@ jobs:
           ls -la dist/
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/*.txz
