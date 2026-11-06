@@ -25,7 +25,7 @@ ICON     := src/usr/local/emhttp/plugins/$(PLUGIN_NAME)/$(PLUGIN_NAME).png
 
 export PYTHON
 
-.PHONY: all build lint verify smoke check ci fetch icon clean distclean release help
+.PHONY: all build lint lint-repo lint-php lint-plg verify smoke check ci fetch icon clean distclean release help
 
 all: build lint verify
 
@@ -33,11 +33,21 @@ all: build lint verify
 build:
 	PLUGIN_VERSION=$(PLUGIN_VERSION) KOMARI_VERSION=$(KOMARI_VERSION) KOMARI_ARCH=$(KOMARI_ARCH) ./scripts/build-plugin.sh
 
-## lint: static checks on the generated .plg and on the WebGUI sources
-lint:
+## lint-repo: source tree checks that need neither a build nor the network
+lint-repo:
 	./scripts/lint-repo.sh
-	./scripts/lint-plg.sh
+
+## lint-php: the WebGUI PHP and .page sources
+lint-php:
 	$(PYTHON) scripts/check-php-syntax.py src/
+
+## lint-plg: static checks on the generated .plg (needs a build first)
+lint-plg:
+	./scripts/lint-plg.sh
+
+## lint: every static check. The .plg checks read dist/, so run `make build`
+##       first on a clean tree; `make ci` orders the two correctly.
+lint: lint-repo lint-php lint-plg
 
 ## verify: verify artifact hashes and layout
 verify:
@@ -51,8 +61,10 @@ smoke:
 check:
 	./scripts/check-upstream.sh
 
-## ci: exactly what the verify job of the build workflow runs, in order
-ci: lint build verify smoke
+## ci: exactly what the verify job of the build workflow runs, in order.
+##     lint-plg.sh reads dist/, so the build has to come before it; ordering
+##     this as `lint build` failed on a clean checkout.
+ci: lint-repo lint-php build lint-plg verify smoke
 	@echo
 	@echo "  ci checks passed"
 
