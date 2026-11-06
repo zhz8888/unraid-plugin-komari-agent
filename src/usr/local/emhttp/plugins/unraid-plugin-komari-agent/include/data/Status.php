@@ -214,8 +214,10 @@ function komari_status_view(array $snapshot)
         ),
         'binary' => array(
             'path' => isset($binary['path']) ? (string) $binary['path'] : KOMARI_BINARY,
+            // status.sh reports "installed" as "exists and is executable", so
+            // there is no separate executable flag to carry here. Copying it
+            // would assert the same fact twice and hide a lost execute bit.
             'installed' => $binaryInstalled,
-            'executable' => $binaryInstalled,
             'size' => $binarySize,
             'size_human' => komari_format_bytes($binarySize),
             'pin_state' => $pinState,
