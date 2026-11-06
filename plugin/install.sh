@@ -154,12 +154,20 @@ fi
 # the file name carries the version. Without this cleanup every release would
 # leave its predecessor behind on the flash device forever.
 echo "[5/6] Removing superseded files from the flash cache..."
-if [ -n "$(ls "${CONFIG_DIR}"/*.txz 2>/dev/null)" ]; then
-  rm -f $(ls "${CONFIG_DIR}"/*.txz 2>/dev/null | grep -v "@@TXZ_NAME@@") 2>/dev/null
-fi
-if [ -n "$(ls "${CONFIG_DIR}"/komari-agent-linux-* 2>/dev/null)" ]; then
-  rm -f $(ls "${CONFIG_DIR}"/komari-agent-linux-* 2>/dev/null | grep -v "@@BIN_NAME@@") 2>/dev/null
-fi
+# The loop is not a stylistic choice: an unquoted $(ls ...) splits its result on
+# IFS, so a file name containing a space would be handed to rm as several
+# arguments. The flash device is vfat and the cache directory is reachable by
+# the user, so the names are not ours to assume.
+for stale in "${CONFIG_DIR}"/*.txz; do
+  [ -f "${stale}" ] || continue
+  [ "${stale##*/}" = "@@TXZ_NAME@@" ] && continue
+  rm -f "${stale}" 2>/dev/null
+done
+for stale in "${CONFIG_DIR}"/komari-agent-linux-*; do
+  [ -f "${stale}" ] || continue
+  [ "${stale##*/}" = "@@BIN_NAME@@" ] && continue
+  rm -f "${stale}" 2>/dev/null
+done
 # Leftovers of an interrupted download. The installer writes straight to the
 # final name, so a stale partial file would be trusted on the next boot.
 rm -f "${CONFIG_DIR}"/*.part 2>/dev/null
