@@ -25,7 +25,7 @@ ICON     := src/usr/local/emhttp/plugins/$(PLUGIN_NAME)/$(PLUGIN_NAME).png
 
 export PYTHON
 
-.PHONY: all build lint verify smoke fetch icon clean distclean release help
+.PHONY: all build lint verify smoke check fetch icon clean distclean release help
 
 all: build lint verify
 
@@ -45,6 +45,10 @@ verify:
 ## smoke: run the packaged scripts under a fake root (needs a build first)
 smoke:
 	./scripts/smoke-test.sh
+
+## check: is there a newer upstream komari-agent release? (needs network)
+check:
+	./scripts/check-upstream.sh
 
 ## fetch: download and unpack the upstream binary only (audit/debug)
 fetch:

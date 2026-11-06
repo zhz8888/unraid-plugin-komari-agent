@@ -53,6 +53,24 @@ cd unraid-plugin-komari-agent
 `make build`, `make lint` and `make verify` are the same three steps. `make help`
 lists every target.
 
+### Checking for an upstream update
+
+`scripts/check-upstream.sh` is the logic behind the nightly `upstream-check`
+workflow, and it runs locally with the same semantics:
+
+```bash
+./scripts/check-upstream.sh              # human readable report
+./scripts/check-upstream.sh --json       # one JSON object
+GITHUB_TOKEN=$(gh auth token) ./scripts/check-upstream.sh   # raise the rate limit
+```
+
+It exits `0` when the check completed, whether or not an upgrade exists — "there
+is no upgrade" is a successful check, and a check that failed every night would
+train people to ignore it. It exits `1` when it could not complete: the pin
+sources disagree, the lock file is malformed, the API is unreachable, or the
+upstream release cannot be packaged. A rate limit is reported as a rate limit,
+not as a wrong pin.
+
 ## Version scheme
 
 Two versions are tracked independently:
@@ -164,15 +182,22 @@ an invisible change during CI.
 2. Update the pin in `Makefile` (`KOMARI_VERSION ?=`) and in
    `scripts/build-plugin.sh` (`KOMARI_VERSION="${KOMARI_VERSION:-...}"`). The two
    must agree with the lock file; the build fails with an explicit message when
-   they do not, and `upstream-check.yml` fails the scheduled run as well.
-3. Build it: `make build`
-4. Run the checks: `make lint && make verify`, then `make smoke`
-5. **Review the upstream changelog** for added or renamed `AGENT_*` variables.
+   they do not, and `scripts/check-upstream.sh` fails the scheduled run as well.
+3. Confirm the pin is coherent before building:
+   ```bash
+   ./scripts/check-upstream.sh
+   ```
+   This is the same check the nightly workflow runs. Locally it needs
+   `GITHUB_TOKEN` once the unauthenticated rate limit (60 requests per hour) is
+   exhausted.
+4. Build it: `make build`
+5. Run the checks: `make lint && make verify`, then `make smoke`
+6. **Review the upstream changelog** for added or renamed `AGENT_*` variables.
    Each variable the plugin maps is a row in the Settings page and a row in the
    configuration table of both READMEs. A new variable the plugin does not map is
    a missing feature; a renamed one silently breaks a setting.
-6. Update `CHANGELOG.md`
-7. Open a PR titled `chore: bump komari-agent to <version>`
+7. Update `CHANGELOG.md`
+8. Open a PR titled `chore: bump komari-agent to <version>`
 
 The maintainer then tags a release and attaches the txz. The **tag is the plugin
 version**, because the `.plg` points at the release asset under that tag.

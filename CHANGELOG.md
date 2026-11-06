@@ -56,6 +56,14 @@ on the WebGUI page.
 - `scripts/make-icon.py` — regenerates the plugin icon
 - `scripts/fetch-plugin.sh` — download, verify and inspect an upstream release
   without packaging it
+- `scripts/check-upstream.sh` — compares the pinned upstream release with the
+  latest one. This is the logic behind the nightly `upstream-check` workflow,
+  extracted into a script so it can be run locally with the same semantics, and
+  so the workflow and the local run cannot drift apart. It reports a rate limit
+  or a network failure differently from a genuinely missing release, because
+  telling a maintainer their pin is wrong when the real problem is a 403 sends
+  them looking in the wrong place. Exit status `0` means the check completed,
+  whether or not an upgrade exists.
 - `docs/05-unraid-plugin-conventions.md` — rule by rule mapping of the official
   Unraid plugin rules onto this plugin
 
@@ -65,6 +73,10 @@ on the WebGUI page.
   means Unraid compares `1.5.11` with `1.5.9` byte-wise, judges the new release to
   be older and refuses the upgrade. The plugin version is now the release date;
   the upstream version is recorded separately.
+- `.github/workflows/upstream-check.yml` no longer contains the comparison
+  logic. It schedules `scripts/check-upstream.sh`, turns its exit status into a
+  red run, writes a job summary, and opens the issue from a body the script
+  generated next to the comparison it describes.
 - `DISABLE_AUTO_UPDATE` defaults to `1`. The agent's built-in updater overwrites
   its own executable in place, which the overlay filesystem throws away on the
   next reboot, and which bypasses the checksum the plugin pins.

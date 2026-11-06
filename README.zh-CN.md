@@ -271,6 +271,21 @@ ls dist/
 # unraid-plugin-komari-agent-proxy.plg               <- 代理版
 ```
 
+### 检查上游更新
+
+每日的 `upstream-check` 工作流调用 `scripts/check-upstream.sh`，该脚本在本地
+运行时的语义完全相同：
+
+```bash
+./scripts/check-upstream.sh              # 人类可读报告
+./scripts/check-upstream.sh --json       # 机器可读
+GITHUB_TOKEN=$(gh auth token) ./scripts/check-upstream.sh   # 提高 API 限流额度
+```
+
+**检查完成就返回 `0`**，无论有没有新版本——"没有新版本"本身就是一次成功的检查。
+无法完成时返回 `1`，并且会区分「限流/网络失败」与「release 真的不存在」：
+明明是被 403 拦住却告诉你 pin 写错了，只会让你去错的地方排查。
+
 覆盖上游版本或架构：
 
 ```bash

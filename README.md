@@ -296,6 +296,23 @@ ls dist/
 # unraid-plugin-komari-agent-proxy.plg               <- mirrored variant
 ```
 
+### Checking for an upstream update
+
+The nightly `upstream-check` workflow runs `scripts/check-upstream.sh`, and the
+script runs locally with the same semantics:
+
+```bash
+./scripts/check-upstream.sh              # human readable report
+./scripts/check-upstream.sh --json       # machine readable
+GITHUB_TOKEN=$(gh auth token) ./scripts/check-upstream.sh   # raise the rate limit
+```
+
+It exits `0` when the check completed, whether or not an upgrade exists — "there
+is no upgrade" is a successful check. It exits `1` when it could not complete,
+and it distinguishes a rate limit or a network failure from a genuinely missing
+release, because telling you your pin is wrong when the real problem is a 403
+would send you looking in the wrong place.
+
 Override the bundled version or architecture:
 
 ```bash
@@ -523,6 +540,7 @@ need verification on a real Unraid host.
 │   ├── build-plugin.sh                    # build: download -> verify -> txz -> plg
 │   ├── fetch-plugin.sh                    # download + verify only (audit)
 │   ├── update-upstream.sh                 # refresh plugin/upstream.lock
+│   ├── check-upstream.sh                  # is a newer upstream release out?
 │   ├── lint-plg.sh                        # static checks on the generated .plg
 │   ├── check-php-syntax.py                # syntax check on the WebGUI sources
 │   ├── smoke-test.sh                      # run the packaged scripts under a fake root
