@@ -26,7 +26,7 @@ Unraid has no systemd, so the plugin brings its own supervision:
 | --- | --- |
 | Agent binary | `/usr/local/sbin/komari-agent` |
 | Supervisor | `/usr/local/emhttp/plugins/unraid-plugin-komari-agent/scripts/supervise.sh` |
-| Service script | `/etc/rc.d/rc.unraid-plugin-komari-agent` |
+| Service script | `/etc/rc.d/rc.komari-agent` |
 | Configuration | `/boot/config/plugins/unraid-plugin-komari-agent/komari-agent.cfg` |
 | Traffic counters | `/boot/config/plugins/unraid-plugin-komari-agent/net_static.json` |
 | Log | `/var/log/komari-agent.log` |
