@@ -27,7 +27,10 @@ die()  { bad "$*"; exit 1; }
 
 FAIL=0
 
-TXZ=$(ls "${DIST}/${PLUGIN_NAME}-"*.txz 2>/dev/null | head -1)
+# `set -e` aborts on a failed assignment, so the empty case has to be
+# neutralised here; otherwise the friendly message below is never reached
+# and the script dies with a bare exit status and no output.
+TXZ=$(ls "${DIST}/${PLUGIN_NAME}-"*.txz 2>/dev/null | head -1 || true)
 [ -n "${TXZ}" ] || die "no package in dist/; run ./scripts/build-plugin.sh first"
 
 WORK=$(mktemp -d)
