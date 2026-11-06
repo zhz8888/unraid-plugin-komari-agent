@@ -194,6 +194,51 @@ function komari_cfg_is_configured()
 }
 
 /**
+ * Strip a userinfo part from a URL.
+ *
+ * "http://user:secret@panel/" carries credentials in the URL itself.
+ * status.sh strips them from the endpoint it reports, because the status page
+ * is readable by every WebGUI user and the value is rendered into the page
+ * source. The server rendered part of the page reads the configuration file
+ * directly, so it has to apply the same rule instead of trusting the script to
+ * have done it.
+ *
+ * @param string $endpoint
+ *
+ * @return string
+ */
+function komari_strip_userinfo($endpoint)
+{
+    $endpoint = (string) $endpoint;
+
+    $schemeEnd = strpos($endpoint, '://');
+    if ($schemeEnd === false) {
+        return $endpoint;
+    }
+
+    // The authority runs from after "://" to the first path, query or
+    // fragment separator, or to the end of the string.
+    $authorityStart = $schemeEnd + 3;
+    $authorityEnd = strlen($endpoint);
+    foreach (array('/', '?', '#') as $separator) {
+        $position = strpos($endpoint, $separator, $authorityStart);
+        if ($position !== false && $position < $authorityEnd) {
+            $authorityEnd = $position;
+        }
+    }
+
+    $authority = substr($endpoint, $authorityStart, $authorityEnd - $authorityStart);
+    $at = strrpos($authority, '@');
+    if ($at === false) {
+        return $endpoint;
+    }
+
+    return substr($endpoint, 0, $authorityStart)
+        . substr($authority, $at + 1)
+        . substr($endpoint, $authorityEnd);
+}
+
+/**
  * Interpret an INI style boolean.
  *
  * @param string $value

@@ -37,6 +37,14 @@ $komariMode = isset($komariStatusMode) && $komariStatusMode === 'detail' ? 'deta
 $info = komari_plugin_info();
 $cfg = komari_cfg();
 
+// The endpoint is rendered into the page source, so the userinfo part of the
+// URL is stripped here as well as in status.sh: "http://user:secret@panel"
+// would otherwise put a credential into a page every WebGUI user can read.
+$endpointShown = komari_strip_userinfo($cfg['ENDPOINT']);
+if ($endpointShown === '') {
+    $endpointShown = 'not configured';
+}
+
 $endpoint = '/plugins/' . KOMARI_PLUGIN_NAME . '/include/data/Status.php';
 $actionEndpoint = '/plugins/' . KOMARI_PLUGIN_NAME . '/include/data/Action.php';
 ?>
@@ -97,7 +105,7 @@ $actionEndpoint = '/plugins/' . KOMARI_PLUGIN_NAME . '/include/data/Action.php';
     echo komari_row_html('Uptime', '<span id="komari-uptime">checking ...</span>');
     echo komari_row_html('Processes', '<span id="komari-pids">checking ...</span>');
     echo komari_row_html('Panel', '<span id="komari-panel">'
-        . komari_esc($cfg['ENDPOINT'] !== '' ? $cfg['ENDPOINT'] : 'not configured') . '</span>');
+        . komari_esc($endpointShown) . '</span>');
     echo komari_row('Agent binary', KOMARI_BINARY);
     echo komari_row('Agent log', KOMARI_LOG);
     ?>
@@ -139,7 +147,7 @@ $actionEndpoint = '/plugins/' . KOMARI_PLUGIN_NAME . '/include/data/Action.php';
     <table class="unraid">
         <?php
         echo komari_row_html('Endpoint', '<span id="komari-panel-endpoint">'
-            . komari_esc($cfg['ENDPOINT'] !== '' ? $cfg['ENDPOINT'] : 'not configured') . '</span>');
+            . komari_esc($endpointShown) . '</span>');
         echo komari_row_html('Token', '<span id="komari-panel-token">'
             . komari_esc($cfg['TOKEN'] !== '' ? 'set' : 'not set') . '</span>');
         echo komari_row_html('Reachability', '<span id="komari-panel-probe">checking ...</span>');
