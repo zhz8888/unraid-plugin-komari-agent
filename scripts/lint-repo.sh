@@ -57,7 +57,35 @@ while IFS= read -r script; do
   fi
 done < <(git ls-files '*.sh' 'src/etc/rc.d/rc.*' 'plugin/*.sh' 2>/dev/null)
 
-# ------------------------------------------------- 2. the install would abort
+# ------------------------------------------------------- 2. executable in git
+# A script that is not recorded as 100755 in the index is not executable after
+# a checkout, and the first CI step dies with "Permission denied" (exit 126)
+# before it can report anything useful. The mode is easy to lose on a
+# filesystem without POSIX permissions -- core.filemode=false means a Windows
+# checkout cannot see the bit, so it silently regresses on the next commit.
+#
+# This is checked here rather than left to the runner so the regression is
+# caught by the same command a contributor runs locally.
+log "checking that the shipped scripts are executable in git..."
+MODE_PROBLEMS=0
+while IFS= read -r entry; do
+  # "<mode> <sha> <stage>\t<path>"
+  mode=$(printf '%s' "${entry}" | awk '{print $1}')
+  path=$(printf '%s' "${entry}" | cut -f2)
+  case "${path}" in
+    *.sh|*.py|src/etc/rc.d/rc.*|src/install/doinst.sh)
+      if [ "${mode}" != "100755" ]; then
+        bad "${path} is recorded as ${mode}, expected 100755"
+        bad "  fix with: git update-index --chmod=+x '${path}'"
+        MODE_PROBLEMS=1
+      fi
+      ;;
+  esac
+done < <(git ls-files -s scripts/ src/etc/rc.d/ src/install/ \
+           src/usr/local/emhttp/plugins/unraid-plugin-komari-agent/scripts/ 2>/dev/null)
+[ "${MODE_PROBLEMS}" -eq 0 ] && ok "every shipped script is 100755 in the index"
+
+# ------------------------------------------------- 3. the install would abort
 # The Unraid installer treats a non-zero exit status of an install or remove
 # command as a failed install: the .plg is moved to /boot/config/plugins-error/
 # and the plugin is dropped from the Plugins page, so the user cannot remove it
@@ -78,7 +106,7 @@ if [ "${FAIL}" -eq 0 ]; then
   ok "no non-zero exit and no shell error mode in the shipped scripts"
 fi
 
-# ---------------------------------------------------------------- 3. line endings
+# ---------------------------------------------------------------- 4. line endings
 # The .plg's <INLINE> scripts are bash, and a CRLF checkout makes bash mis-parse
 # every line continuation.
 log "checking line endings..."
@@ -91,7 +119,7 @@ while IFS= read -r f; do
 done < <(git ls-files '*.sh' '*.plg.in' 'plugin/*.sh' 'src/etc/rc.d/rc.*' '*.page' 2>/dev/null)
 [ "${CRLF_FOUND}" -eq 0 ] && ok "all shipped scripts and pages are LF-only"
 
-# ------------------------------------------------------- 4. the upstream pin
+# ------------------------------------------------------- 5. the upstream pin
 # The lock file, the Makefile and the build script all carry the pinned
 # version and have to agree. A second copy that drifts is how the build ends up
 # refusing its own lock file. This is the offline half of check-upstream.sh;
@@ -185,7 +213,7 @@ else
   bad "the upstream pin is inconsistent"
 fi
 
-# ------------------------------------------------------- 5. hand edited metadata
+# ------------------------------------------------------- 6. hand edited metadata
 # Workflow YAML and issue templates are edited by hand and have no other
 # validator. A trailing tab or a duplicated key turns the whole workflow file
 # into a syntax error that GitHub reports as "invalid workflow file" with no
@@ -221,7 +249,7 @@ else
   bad "some workflow or issue template YAML does not parse"
 fi
 
-# ---------------------------------------------------------- 6. CA metadata
+# ---------------------------------------------------------- 7. CA metadata
 log "checking the Community Applications metadata..."
 if "${PYTHON}" - <<'PY'
 import re

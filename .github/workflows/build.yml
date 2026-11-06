@@ -81,6 +81,28 @@ jobs:
         # missing, so installing it here is what makes the check actually run.
         run: python3 -m pip install --quiet --disable-pip-version-check pyyaml
 
+      - name: Restore the executable bit on the scripts
+        # A checkout on a filesystem without POSIX modes -- Windows, which is
+        # where this repository is primarily edited -- records every script as
+        # 100644. A runner then fails the first step with "Permission denied"
+        # and exit status 126, which says nothing about the script itself.
+        #
+        # The mode is fixed in the index (git update-index --chmod=+x), but
+        # core.filemode=false means a Windows checkout cannot observe it, so it
+        # can silently regress on the next commit. This step makes the pipeline
+        # independent of that: whatever the index says, the scripts that are
+        # about to run are executable.
+        run: |
+          set -euo pipefail
+          chmod +x scripts/*.sh scripts/*.py \
+                   src/etc/rc.d/rc.komari-agent \
+                   src/install/doinst.sh \
+                   src/usr/local/emhttp/plugins/unraid-plugin-komari-agent/scripts/*.sh
+          echo "executable scripts:"
+          git ls-files -s scripts/ src/etc/rc.d/ src/install/ \
+            src/usr/local/emhttp/plugins/unraid-plugin-komari-agent/scripts/ \
+            | awk '{print "  " $1 "  " $4}'
+
       # ---------------------------------------------------------- static checks
       # These need neither the network nor a build, so they fail fast and
       # specifically before anything is downloaded.
