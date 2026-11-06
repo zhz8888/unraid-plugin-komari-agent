@@ -451,6 +451,8 @@ $actionEndpoint = '/plugins/' . KOMARI_PLUGIN_NAME . '/include/data/Action.php';
         }
 
         event.preventDefault();
+        // Disabled for the duration of the request only: a failed action has
+        // to leave the button usable, or the tab is dead until a reload.
         target.disabled = true;
 
         var result = byId('komari-action-result');
@@ -468,6 +470,8 @@ $actionEndpoint = '/plugins/' . KOMARI_PLUGIN_NAME . '/include/data/Action.php';
             if (result) {
                 result.textContent = 'The action failed. See the WebGUI log for details.';
             }
+        }).always(function () {
+            target.disabled = false;
         });
     });
 

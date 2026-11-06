@@ -452,8 +452,16 @@ echo komari_field(
     }
 
     function runAction(action, button) {
+        // The button is disabled for the duration of the request so that a
+        // double click cannot start the same script twice. It has to come back
+        // on both outcomes: an action that failed still leaves the user in
+        // front of the page and expects to retry.
         button.disabled = true;
         showResult('Working ...', '', false);
+
+        function done() {
+            button.disabled = false;
+        }
 
         $.post(actionEndpoint, {action: action}, function (data) {
             var message = (data && data.message) ? data.message : 'Done.';
@@ -461,7 +469,7 @@ echo komari_field(
             window.setTimeout(refreshState, 2500);
         }, 'json').fail(function () {
             showResult('The action failed.', 'See the WebGUI log for details.', true);
-        });
+        }).always(done);
     }
 
     document.addEventListener('click', function (event) {
