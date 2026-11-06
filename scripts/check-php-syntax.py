@@ -236,10 +236,14 @@ def check_body(path, body, offset):
 
 
 def check_defined_functions(root):
-    """Cross-check dmr_/ka_ helper calls against the helpers that are declared.
+    """Cross-check komari_ helper calls against the helpers that are declared.
 
     A typo in a helper name is a fatal error at request time and the heuristic
     scanner above cannot see it, because the call is syntactically valid.
+
+    The prefix has to match what the code base actually uses. This project
+    names its helpers komari_*; matching a different prefix would leave the
+    check permanently green while never looking at a single call.
     """
     problems = []
     if not os.path.isdir(root):
@@ -248,7 +252,7 @@ def check_defined_functions(root):
     defined = set()
     called = {}
     pattern_def = re.compile(r'^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', re.M)
-    pattern_call = re.compile(r'\b(ka_[a-z0-9_]+)\s*\(')
+    pattern_call = re.compile(r'\b(komari_[a-z0-9_]+)\s*\(')
 
     files = list(iter_php_files(root)) + list(iter_page_files(root))
     for path in files:
