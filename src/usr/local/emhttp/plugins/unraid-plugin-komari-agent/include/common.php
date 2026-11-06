@@ -93,6 +93,13 @@ function komari_plugin_info()
         $parsed = @parse_ini_file($file, false, INI_SCANNER_RAW);
         if (is_array($parsed)) {
             foreach ($parsed as $key => $value) {
+                // plugin.info is generated with upper case keys (PLUGIN_VERSION,
+                // BINARY_SHA256, ...) while this array uses the lower case names
+                // the pages read. array_key_exists() is case sensitive, so
+                // normalising here is what makes the two meet; without it every
+                // value is dropped and the page reports "unknown" for the
+                // version it actually ships.
+                $key = strtolower((string) $key);
                 if (!array_key_exists($key, $info) || is_array($value)) {
                     continue;
                 }
