@@ -431,6 +431,73 @@ PY
     fi
   done
 
+  # 9. The Community Applications wrapper has to name the very same pluginURL
+  #    as the .plg. If they differ, the self update path in CA installs a
+  #    different file than the one the user asked for. The comparison has to go
+  #    through a real XML parser: the .plg stores the value as an entity
+  #    reference, so a textual comparison would always report a mismatch.
+  log "checking the Community Applications wrapper..."
+  CA_XML="${REPO_ROOT}/ca/${PLUGIN_NAME}.xml"
+  if [ -f "${CA_XML}" ]; then
+    "${PYTHON}" - "${PLGS[0]}" "${CA_XML}" <<'PY'
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+plg_path, ca_path = sys.argv[1], sys.argv[2]
+
+plg_url = ET.parse(plg_path).getroot().get('pluginURL') or ''
+with open(ca_path, encoding='utf-8') as handle:
+    ca_text = handle.read()
+
+match = re.search(r'<PluginURL>([^<]+)</PluginURL>', ca_text)
+ca_url = match.group(1).strip() if match else ''
+
+if not ca_url:
+    print("PROBLEM the CA wrapper has no <PluginURL>")
+    sys.exit(1)
+
+if plg_url != ca_url:
+    print("PROBLEM the CA wrapper points at a different plugin file")
+    print("    plg: %s" % plg_url)
+    print("    ca:  %s" % ca_url)
+    sys.exit(1)
+
+print("OK %s" % ca_url)
+PY
+    if [ $? -eq 0 ]; then
+      ok "the CA wrapper names the same pluginURL as the .plg"
+    else
+      bad "the CA wrapper and the .plg disagree about pluginURL"; FAIL=1
+    fi
+  else
+    log "skipping the CA wrapper check (${CA_XML} missing)"
+  fi
+
+  # 10. The repository root needs a ca_profile.xml with a non-empty <Profile>,
+  #     otherwise Community Apps blocks the submission.
+  CA_PROFILE="${REPO_ROOT}/ca_profile.xml"
+  if [ -f "${CA_PROFILE}" ]; then
+    if "${PYTHON}" - "${CA_PROFILE}" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+root = ET.parse(sys.argv[1]).getroot()
+profile = root.findtext('Profile') or ''
+if not profile.strip():
+    print("PROBLEM <Profile> is empty")
+    sys.exit(1)
+print("OK profile has %d characters" % len(profile.strip()))
+PY
+    then
+      ok "ca_profile.xml is present and its Profile is not empty"
+    else
+      bad "ca_profile.xml is invalid"; FAIL=1
+    fi
+  else
+    bad "ca_profile.xml is missing from the repository root"; FAIL=1
+  fi
+
   echo
   if [ "${FAIL}" -eq 0 ]; then
     log "all checks passed"
