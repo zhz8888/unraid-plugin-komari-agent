@@ -1,0 +1,160 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!--
+  unraid-plugin-komari-agent : Unraid plugin definition.
+
+  Rendered by scripts/build-plugin.sh from this template. Placeholders wrapped
+  in double at-signs are replaced at build time with the actual version,
+  filenames, checksums and download URLs.
+
+  Structure follows the conventions the official Limetech plugins use
+  (unraid/unraid-tailscale, unraid/apprise-plugin, unraid/unraid-nvidia-driver):
+
+    - <PLUGIN> carries the attributes the Unraid plugin installer and the
+      WebGUI read: name, author, version, pluginURL, support, min, launch and
+      icon. Attributes such as donate or webUI are not honoured by the
+      installer and are therefore not used.
+    - The version is the plugin's own release version: the release date as
+      YYYYMMDD, followed by a letter suffix when more than one release
+      happens on the same day (YYYYMMDD.a, YYYYMMDD.b and so on). The
+      installer compares plugin versions with strcmp(), a byte wise string
+      compare, so this format is what sorts in release order:
+      20261106 < 20261106.a < 20261106.b < 20261107. A semantic version
+      such as 1.5.12 does not sort that way, because it sorts below 1.5.9.
+      The version of the bundled upstream agent is carried separately in
+      the "upstream" entity.
+    - The package is cached on the flash device under
+      /boot/config/plugins/<name>/ and its SHA256 is pinned in the plugin
+      file. The version is part of the file name, because the installer never
+      overwrites a cached file that already exists.
+    - The upstream binary is cached on the flash device as a second FILE
+      entry. /usr is an overlay filesystem on Unraid and is reset on every
+      boot, so the executable is re-installed from this cache on every boot.
+    - The install script (Method="install") and the remove script
+      (Method="remove") are idempotent, because the installer runs them again
+      on every boot. Neither of them may exit non-zero: a non-zero exit
+      aborts the install, moves the .plg to /boot/config/plugins-error/ and
+      keeps the plugin from being registered, so the user would lose the
+      Uninstall button in the WebGUI.
+
+  Two substitution mechanisms are in use, and the difference matters:
+
+    - XML entities (&name;, &version;, ...) are expanded by the XML parser.
+      They are therefore only used in attribute values and in element text,
+      where the expansion is guaranteed.
+    - Text inside a CDATA section is literal. An entity reference inside
+      CDATA is NOT expanded, it would end up in the script verbatim. The
+      build time placeholders (@@PLUGIN_NAME@@, ...) are used there instead.
+
+  This single template produces two plugin files:
+    - unraid-plugin-komari-agent.plg         downloads from GitHub directly
+    - unraid-plugin-komari-agent-proxy.plg   downloads through the
+      gh-proxy.org mirror, for networks that cannot reach github.com
+  Everything else is identical, because both variants install the very same
+  package. Only the pluginURL, the download URL and the source note differ.
+  Install one of them, never both: the installer registers one symlink per
+  .plg file name, so two files would show up as two separate entries in the
+  Plugins tab.
+-->
+<!ENTITY name          "unraid-plugin-komari-agent">
+<!ENTITY author        "zhz8888">
+<!ENTITY version       "@@PLUGIN_VERSION@@">
+<!ENTITY upstream      "@@UPSTREAM_VERSION@@">
+<!ENTITY pluginURL     "@@PLG_URL@@">
+<!ENTITY support       "https://github.com/zhz8888/unraid-plugin-komari-agent/issues">
+<!ENTITY min           "7.0.0">
+<!ENTITY launch        "Settings/KomariAgent">
+<!ENTITY icon          "unraid-plugin-komari-agent.png">
+<!ENTITY binName       "@@BIN_NAME@@">
+<!ENTITY binURL        "@@BIN_URL@@">
+<!ENTITY binSHA256     "@@BIN_SHA256@@">
+<!ENTITY txzName       "@@TXZ_NAME@@">
+<!ENTITY txzURL        "@@TXZ_URL@@">
+<!ENTITY txzSHA256     "@@TXZ_SHA256@@">
+<!ENTITY sourceNote    "@@SOURCE_NOTE@@">
+]>
+
+<PLUGIN
+  name="&name;"
+  author="&author;"
+  version="&version;"
+  pluginURL="&pluginURL;"
+  support="&support;"
+  min="&min;"
+  launch="&launch;"
+  icon="&icon;"
+>
+
+<CHANGES><![CDATA[##@@PLUGIN_NAME@@
+###@@PLUGIN_VERSION@@
+
+@@CHANGES_BODY@@
+
+### Background
+
+komari-agent is the monitoring agent for the Komari status dashboard. It
+reports CPU, memory, disk, network throughput, load and uptime to a Komari
+panel over a WebSocket connection, and can execute panel-issued commands when
+remote control is enabled.
+
+The agent is a long running daemon, not a CLI tool: it needs a service script,
+a supervisor that restarts it when it crashes, log rotation and a persistent
+configuration file. Unraid has none of that out of the box, which is what this
+plugin provides.
+
+The upstream binary is redistributed unmodified and is verified against the
+SHA256 published by the GitHub Releases API on every build.
+
+@@SOURCE_NOTE@@
+]]>
+</CHANGES>
+
+<!-- ============================================================
+     Upstream agent binary, cached on the flash device.
+
+     The file lives on /boot (vfat), which cannot store the executable bit and
+     is far too slow to run a daemon from. It is a cache only: the install
+     script copies it to /usr/local/sbin/komari-agent with mode 0755 on every
+     install, which is what makes the binary survive a reboot (/usr is an
+     overlay filesystem and is reset on every boot).
+     ============================================================ -->
+<FILE Name="/boot/config/plugins/&name;/&binName;">
+<URL>&binURL;</URL>
+<SHA256>&binSHA256;</SHA256>
+</FILE>
+
+<!-- ============================================================
+     Plugin package (Slackware txz, installed by upgradepkg)
+
+     This carries the rc script, the WebGUI page, the supervisor scripts and
+     the package description. It is rebuilt for every plugin release, so its
+     name embeds the plugin version and the installer downloads it again.
+     ============================================================ -->
+<FILE Name="/boot/config/plugins/&name;/&txzName;">
+<URL>&txzURL;</URL>
+<SHA256>&txzSHA256;</SHA256>
+</FILE>
+
+<!-- ============================================================
+     Install script
+     ============================================================ -->
+<FILE Run="/bin/bash" Method="install">
+<INLINE>
+<![CDATA[
+@@INSTALL_BODY@@
+]]>
+</INLINE>
+</FILE>
+
+<!-- ============================================================
+     Uninstall script
+     ============================================================ -->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+<![CDATA[
+@@REMOVE_BODY@@
+]]>
+</INLINE>
+</FILE>
+
+</PLUGIN>

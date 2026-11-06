@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Upstream bug (komari-agent itself)
+    url: https://github.com/komari-monitor/komari-agent/issues
+    about: Problems with metrics, the panel connection or remote control belong upstream.
+  - name: Komari panel documentation
+    url: https://github.com/komari-monitor/komari
+    about: Questions about the Komari panel, its installation and its configuration.
+  - name: Unraid forum thread
+    url: https://forums.unraid.net/
+    about: General Unraid questions that are not specific to this plugin.

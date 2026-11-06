@@ -1,0 +1,21 @@
+# Build and release artifacts
+pkg/
+dist/
+
+# Local research notes; never part of the repository
+.research/
+
+# Temporary files
+*.tmp
+*.part
+
+# Editor / OS noise
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc

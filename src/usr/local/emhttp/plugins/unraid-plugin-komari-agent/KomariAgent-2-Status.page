@@ -1,0 +1,23 @@
+Menu="KomariAgent"
+Icon="unraid-plugin-komari-agent.png"
+Title="Status"
+Type="xmenu"
+Tag="dashboard"
+Markdown="false"
+---
+<?php
+try {
+    $docroot = $docroot ?? ($_SERVER['DOCUMENT_ROOT'] ?: '/usr/local/emhttp');
+    $komariStatusMode = 'detail';
+    require_once "{$docroot}/plugins/unraid-plugin-komari-agent/include/Pages/Status.php";
+} catch (Throwable $e) {
+    @file_put_contents(
+        '/var/log/unraid-plugin-komari-agent-page-error.log',
+        date('c') . ' ' . get_class($e) . ': ' . $e->getMessage() . "\n"
+            . $e->getTraceAsString() . "\n",
+        FILE_APPEND
+    );
+    echo '<div class="error">The page could not be rendered. Details were '
+        . 'written to /var/log/unraid-plugin-komari-agent-page-error.log.</div>';
+}
+?>

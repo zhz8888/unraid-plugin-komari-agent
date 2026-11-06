@@ -1,0 +1,19 @@
+# Normalise line endings for cross-platform contributors.
+* text=auto eol=lf
+
+# Shell scripts must keep LF and stay executable. A CRLF checkout makes bash
+# mis-parse line continuations, and the <INLINE> scripts inside the .plg are
+# bash too.
+*.sh text eol=lf
+*.plg.in text eol=lf
+
+# WebGUI pages and PHP sources are shipped to the host verbatim
+*.php text eol=lf
+*.page text eol=lf
+*.info text eol=lf
+
+# Build artifacts are binary
+*.txz binary
+*.gz binary
+*.png binary
+*.ico binary

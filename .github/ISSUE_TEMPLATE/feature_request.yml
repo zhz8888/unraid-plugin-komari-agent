@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest an improvement to the plugin, its packaging or its WebGUI page
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests about `komari-agent` behaviour itself — what it
+        measures, how it talks to the panel, how remote control works — belong
+        upstream at https://github.com/komari-monitor/komari-agent/issues.
+        This form is for the Unraid packaging layer: install scripts, the
+        daemon supervision, the WebGUI page, the build pipeline and the docs.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve
+      description: Describe the use case rather than jumping to a solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+
+  - type: textarea
+    id: upstream-support
+    attributes:
+      label: Upstream support
+      description: |
+        If the request needs a new `AGENT_*` environment variable or a new
+        command line flag, say so. The plugin only maps variables the agent
+        actually reads — a setting nothing consumes would be a dead key.
+      placeholder: 'Requires AGENT_FOO, available from komari-agent 1.6.0'
+    validations:
+      required: false

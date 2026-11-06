@@ -1,0 +1,21 @@
+# logrotate configuration for the komari agent.
+#
+# /var/log is a tmpfs on Unraid, so this log does not survive a reboot and
+# cannot fill the flash device. It can still fill the RAM, which is why it is
+# rotated here as well as size-capped by the start script.
+#
+# copytruncate is required: the agent holds the log file open (it is started
+# with its stdout and stderr redirected to it) and does not reopen it on a
+# signal, so the file has to be truncated in place instead of being renamed.
+# Renaming would leave the agent writing to an unlinked inode and the disk
+# usage would never come back.
+
+/var/log/komari-agent.log {
+    size 2M
+    rotate 2
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}

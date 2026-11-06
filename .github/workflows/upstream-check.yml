@@ -1,0 +1,201 @@
+name: check upstream
+
+on:
+  schedule:
+    # Every day at 12:00 UTC
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Check for a newer komari-agent
+    runs-on: ubuntu-latest
+    env:
+      KOMARI_ARCH: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the pinned upstream version
+        id: pinned
+        run: |
+          set -euo pipefail
+
+          # The lock file is the single source of truth for which upstream bytes
+          # are bundled. Read it here rather than repeating the version: a second
+          # copy would drift, and a stale copy is exactly how a bogus "upgrade"
+          # issue gets filed.
+          LOCK=plugin/upstream.lock
+          [ -f "$LOCK" ] || { echo "::error::$LOCK is missing"; exit 1; }
+
+          PIN_VERSION=$(awk -F'=' '/^version[[:space:]]*=/{gsub(/[[:space:]]/,"",$2);print $2;exit}' "$LOCK")
+          PIN_ARCH=$(awk -F'KOMARI_ARCH:-' '/KOMARI_ARCH:-/{split($2,a,"}");print a[1];exit}' scripts/build-plugin.sh)
+
+          if [ -z "$PIN_VERSION" ] || [ -z "$PIN_ARCH" ]; then
+            echo "::error::could not read the pinned upstream version from $LOCK"
+            exit 1
+          fi
+
+          # The Makefile and the build script repeat the pin for local builds. A
+          # mismatch means the check, the build and the lock file disagree about
+          # what is bundled, which is the other way a wrong "current" version
+          # turns into a fake update.
+          MAKE_VERSION=$(awk -F'=' '/^KOMARI_VERSION[[:space:]]*\?=/{gsub(/[[:space:]]/,"",$2);print $2;exit}' Makefile)
+          SCRIPT_VERSION=$(awk -F'KOMARI_VERSION:-' '/KOMARI_VERSION:-/{split($2,a,"}");print a[1];exit}' scripts/build-plugin.sh)
+
+          if [ -n "$MAKE_VERSION" ] && [ "$MAKE_VERSION" != "$PIN_VERSION" ]; then
+            echo "::error::Makefile pins ${MAKE_VERSION}, $LOCK pins ${PIN_VERSION}"
+            exit 1
+          fi
+          if [ -n "$SCRIPT_VERSION" ] && [ "$SCRIPT_VERSION" != "$PIN_VERSION" ]; then
+            echo "::error::scripts/build-plugin.sh defaults to ${SCRIPT_VERSION}, $LOCK pins ${PIN_VERSION}"
+            exit 1
+          fi
+
+          # The lock file also records the asset of the architecture the plugin
+          # publishes. Both have to name the same file, otherwise the build would
+          # refuse the lock entry. Split on '=' because the file writes
+          # "name = komari-agent-linux-amd64" with spaces around the separator.
+          LOCK_ASSET=$(awk -F'=' -v sec="[$PIN_ARCH]" '
+            $0 == sec { inse = 1; next }
+            /^\[/ { inse = 0 }
+            inse && $1 ~ /^[[:space:]]*name[[:space:]]*$/ {
+              gsub(/[[:space:]]/, "", $2); print $2; exit
+            }
+          ' "$LOCK")
+          EXPECTED_ASSET="komari-agent-linux-${PIN_ARCH}"
+          if [ "$LOCK_ASSET" != "$EXPECTED_ASSET" ]; then
+            echo "::error::$LOCK [$PIN_ARCH] names '${LOCK_ASSET}', expected '${EXPECTED_ASSET}'"
+            exit 1
+          fi
+
+          echo "version=$PIN_VERSION" >> "$GITHUB_OUTPUT"
+          echo "arch=$PIN_ARCH"       >> "$GITHUB_OUTPUT"
+          echo "asset=$LOCK_ASSET"    >> "$GITHUB_OUTPUT"
+          echo "pinned ${PIN_VERSION} (${PIN_ARCH}), asset ${LOCK_ASSET}"
+
+      - name: Query the GitHub Releases API
+        id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PIN_VERSION='${{ steps.pinned.outputs.version }}'
+          PIN_ARCH='${{ steps.pinned.outputs.arch }}'
+
+          # The plugin bundles one asset of one release. A tag that exists but
+          # does not carry that asset is not something this plugin can ship, so
+          # the asset list is checked rather than only the tag name.
+          curl -fsSL --retry 3 --max-time 120 \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'User-Agent: unraid-plugin-komari-agent-upstream-check' \
+            https://api.github.com/repos/komari-monitor/komari-agent/releases/latest \
+            -o /tmp/release.json
+
+          LATEST=$(python3 -c 'import json,sys; print(json.load(open("/tmp/release.json"))["tag_name"])')
+          if [ -z "$LATEST" ]; then
+            echo "::error::could not determine the latest upstream release"
+            exit 1
+          fi
+
+          ASSET="komari-agent-linux-${PIN_ARCH}"
+          if ! python3 -c '
+          import json, sys
+          release = json.load(open("/tmp/release.json"))
+          asset = sys.argv[1]
+          names = [a.get("name") for a in release.get("assets", [])]
+          if asset not in names:
+              sys.exit("release %s does not carry %s (has: %s)"
+                       % (release.get("tag_name"), asset, ", ".join(names) or "(none)"))
+          digest = next(a.get("digest") for a in release["assets"] if a.get("name") == asset)
+          if not (digest or "").startswith("sha256:"):
+              sys.exit("asset %s has no sha256 digest; the build would refuse it" % asset)
+          print("%s  %s" % (asset, digest))
+          ' "$ASSET"; then
+            echo "::error::the latest upstream release cannot be packaged"
+            exit 1
+          fi
+
+          # If the pinned version is not a real release at all, either the pin
+          # is wrong or the release was deleted. Comparing versions is
+          # meaningless then.
+          if ! curl -fsSL --retry 3 --max-time 60 \
+                 -H 'Accept: application/vnd.github+json' \
+                 -H "Authorization: Bearer ${GH_TOKEN}" \
+                 -H 'User-Agent: unraid-plugin-komari-agent-upstream-check' \
+                 "https://api.github.com/repos/komari-monitor/komari-agent/releases/tags/${PIN_VERSION}" \
+                 -o /tmp/pinned.json; then
+            echo "::error::pinned version ${PIN_VERSION} is not a release in komari-monitor/komari-agent"
+            exit 1
+          fi
+
+          # Only a real upgrade is worth an issue: a tag that sorts lower must
+          # never become a "bump" request that downgrades the binary.
+          NEWER=false
+          if [ "$LATEST" != "$PIN_VERSION" ]; then
+            if [ "$(printf '%s\n%s\n' "$PIN_VERSION" "$LATEST" | sort -V | tail -1)" = "$LATEST" ]; then
+              NEWER=true
+            fi
+          fi
+
+          echo "latest=$LATEST"       >> "$GITHUB_OUTPUT"
+          echo "current=$PIN_VERSION" >> "$GITHUB_OUTPUT"
+          echo "asset=$ASSET"         >> "$GITHUB_OUTPUT"
+          echo "newer=$NEWER"         >> "$GITHUB_OUTPUT"
+          echo "pinned ${PIN_VERSION}, latest ${LATEST}, newer ${NEWER}"
+
+      - name: Open an issue when a newer version exists
+        if: steps.latest.outputs.newer == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const latest  = '${{ steps.latest.outputs.latest }}';
+            const current = '${{ steps.latest.outputs.current }}';
+            const asset   = '${{ steps.latest.outputs.asset }}';
+            const title   = `chore: bump komari-agent to ${latest}`;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dependencies',
+            });
+            if (issues.some(i => i.title === title)) {
+              core.info('an issue for this version already exists');
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['dependencies'],
+              body: [
+                `Upstream \`komari-agent\` **${latest}** is available; this repo pins **${current}**.`,
+                '',
+                `The asset this plugin bundles is \`${asset}\`. Its SHA256 is recorded in \`plugin/upstream.lock\` and verified against the downloaded bytes at build time.`,
+                '',
+                'To update:',
+                '```bash',
+                `./scripts/update-upstream.sh ${latest}`,
+                './scripts/build-plugin.sh',
+                './scripts/lint-plg.sh',
+                './scripts/verify-release.sh',
+                './scripts/smoke-test.sh',
+                '```',
+                '',
+                'Review the `plugin/upstream.lock` diff: the version, size and SHA256 of every recorded architecture must change together.',
+                '',
+                'Then:',
+                `1. Update the pin in \`Makefile\` (\`KOMARI_VERSION ?= ${latest}\`) and in \`scripts/build-plugin.sh\` — all three sources must agree, or the build and this check fail.`,
+                '2. Add a `CHANGELOG.md` entry for the new plugin version.',
+                '3. Open a PR, then tag the release.',
+                '',
+                'Review the upstream changelog before bumping: a new agent release can add or rename `AGENT_*` environment variables, and the Settings page maps them one by one.',
+              ].join('\n'),
+            });

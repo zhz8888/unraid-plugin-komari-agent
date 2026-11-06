@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Repository profile for Community Apps.
+
+  The file name has to be exactly ca_profile.xml and it has to live in the
+  repository root. Community Apps blocks the finalization of a submission
+  when the file is missing or when the <Profile> element is empty.
+
+  See https://ca.unraid.net/submit/help/repository-info-xml
+-->
+<CommunityApplications>
+  <Profile>
+    unraid-plugin-komari-agent packages the Komari monitoring agent for
+    Unraid. The agent reports CPU, memory, disk, network throughput, load and
+    uptime to a Komari status panel over a WebSocket connection. Unraid has no
+    systemd and nowhere to keep a daemon's state, so this plugin supplies the
+    missing layer: an rc script, a supervisor that restarts the agent when it
+    crashes, log rotation, a flash-resident binary cache that survives the
+    overlay filesystem being reset on every boot, and a Settings page that
+    edits the configuration and shows live status. The upstream binary is
+    redistributed unmodified from the official GitHub Release and is verified
+    against a pinned SHA256 on every build.
+    Remote control and self-update are disabled by default. The repository
+    contains the plugin definition, the Slackware packaging, the WebGUI pages
+    and the build and verification scripts.
+  </Profile>
+  <Icon>https://raw.githubusercontent.com/zhz8888/unraid-plugin-komari-agent/main/icon.svg</Icon>
+  <WebPage>https://github.com/zhz8888/unraid-plugin-komari-agent</WebPage>
+  <!--
+    A forum thread is required before the plugin can be listed in Community
+    Apps. Uncomment it once the thread exists.
+  -->
+  <!-- <Forum>https://forums.unraid.net/topic/YOUR_SUPPORT_TOPIC</Forum> -->
+</CommunityApplications>

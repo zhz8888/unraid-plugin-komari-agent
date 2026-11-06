@@ -1,0 +1,20 @@
+# HOW TO EDIT THIS FILE:
+# The "handy ruler" below makes it easier to edit a package description.
+# The right column is a ruler, so every line of the description lines up.
+#                                       .
+# unraid-plugin-komari-agent: Komari monitoring agent for Unraid
+# unraid-plugin-komari-agent:
+# unraid-plugin-komari-agent: Runs the komari-agent daemon, which reports CPU,
+# unraid-plugin-komari-agent: memory, disk, network traffic and load to a
+# unraid-plugin-komari-agent: Komari dashboard, and serves the WebGUI pages
+# unraid-plugin-komari-agent: that configure it.
+# unraid-plugin-komari-agent:
+# unraid-plugin-komari-agent: The agent runs as a supervised daemon under
+# unraid-plugin-komari-agent: /etc/rc.d/rc.komari-agent, with its binary
+# unraid-plugin-komari-agent: pinned on the flash device and restored into
+# unraid-plugin-komari-agent: /usr/local/sbin at every boot.
+# unraid-plugin-komari-agent:
+# unraid-plugin-komari-agent: Upstream: https://github.com/komari-monitor/komari-agent
+# unraid-plugin-komari-agent: The upstream binary is redistributed unmodified
+# unraid-plugin-komari-agent: under the MIT license.
+# unraid-plugin-komari-agent:

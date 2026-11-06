@@ -1,0 +1,140 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      plugin_version:
+        description: 'Plugin version (YYYYMMDD, or YYYYMMDD.a for a second release on the same day); defaults to a fixed value'
+        required: false
+      upstream_version:
+        description: 'komari-agent version to bundle; leave empty to use the version pinned in scripts/build-plugin.sh'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    env:
+      # A fixed plugin version keeps the build reproducible: the version is
+      # part of the package name, so a moving timestamp would change the
+      # artifact between the builds that are compared below.
+      PLUGIN_VERSION: ${{ github.event.inputs.plugin_version || '20260101' }}
+      # Empty means "use the default of scripts/build-plugin.sh", which is the
+      # one place the bundled version is pinned. A copy here would be a second
+      # source of truth and could drift away from the upstream check.
+      #
+      # This has to live at job level, not on the build step: the two
+      # reproducibility steps below rebuild the package, and if they saw a
+      # different upstream version than the first build, the hash comparison
+      # would fail for the wrong reason.
+      KOMARI_VERSION: ${{ github.event.inputs.upstream_version }}
+      # Unraid is x86_64 only, so this is the only published architecture.
+      KOMARI_ARCH: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Build the plugin
+        run: ./scripts/build-plugin.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint the generated .plg
+        run: ./scripts/lint-plg.sh
+
+      - name: Check the WebGUI sources
+        run: ./scripts/check-php-syntax.py src/
+
+      - name: Verify artifacts
+        run: ./scripts/verify-release.sh
+
+      - name: Check reproducibility (same tree)
+        run: |
+          set -euo pipefail
+          BEFORE=$(sha256sum dist/*.txz | awk '{print $1}')
+          ./scripts/build-plugin.sh
+          AFTER=$(sha256sum dist/*.txz | awk '{print $1}')
+          if [ "$BEFORE" != "$AFTER" ]; then
+            echo "::error::build is not reproducible ($BEFORE != $AFTER)"
+            exit 1
+          fi
+          echo "reproducible build: $AFTER"
+
+      - name: Check reproducibility (from a fresh clone)
+        run: |
+          set -euo pipefail
+          HERE=$(sha256sum dist/*.txz | awk '{print $1}')
+          git clone --quiet . /tmp/rebuild-check
+          ( cd /tmp/rebuild-check && ./scripts/build-plugin.sh )
+          THERE=$(sha256sum /tmp/rebuild-check/dist/*.txz | awk '{print $1}')
+          if [ "$HERE" != "$THERE" ]; then
+            echo "::error::build depends on the checkout location ($HERE != $THERE)"
+            exit 1
+          fi
+          echo "reproducible across checkouts: $THERE"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          # Only the package is uploaded. The .plg of a non-release build
+          # points at a release tag that does not exist (PLUGIN_VERSION is the
+          # fixed build version), so installing that artifact would fail with
+          # a download error. The release job below rebuilds the installable
+          # .plg from the git tag it publishes.
+          name: unraid-plugin-komari-agent
+          path: dist/*.txz
+          if-no-files-found: error
+
+  release:
+    name: Attach artifacts to release
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # The tag is the plugin version. The .plg points at the release asset
+      # under the same tag, so both have to agree.
+      PLUGIN_VERSION: ${{ github.ref_name }}
+      # Same rule as above: the build script owns the pinned version, so an
+      # empty value means "use its default".
+      KOMARI_VERSION: ${{ github.event.inputs.upstream_version }}
+      KOMARI_ARCH: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Build with the tag version
+        run: ./scripts/build-plugin.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint the release artifacts
+        run: ./scripts/lint-plg.sh
+
+      - name: Verify the release artifacts
+        run: ./scripts/verify-release.sh
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.txz
+            dist/*.plg
+          generate_release_notes: true

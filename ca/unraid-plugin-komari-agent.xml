@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Community Applications entry for unraid-plugin-komari-agent.
+
+  This is the metadata the Community Applications app reads. It is a
+  different format from the .plg plugin definition: the .plg describes how
+  the plugin is installed, this file describes how the plugin is listed in
+  the Apps tab.
+
+  Requirements taken from the official submission guide:
+
+    - The <PluginURL> must match the pluginURL attribute of the .plg file
+      exactly, otherwise the self update path installs a different file.
+    - The .plg already carries a support attribute, so the wrapper <Support>
+      is optional. Replace it with a forum thread once one exists: Community
+      Apps expects a forum topic as the support address of a plugin.
+    - The repository root needs a ca_profile.xml with a non-empty <Profile>.
+
+  Before this entry can be submitted:
+
+    1. Create a support thread in the Unraid forums under
+       "Community Applications" and put its URL into <Support>.
+    2. Check that the <Category> value is one the CA app offers.
+    3. Open a pull request against
+       https://github.com/unraid/community.applications and add this file to
+       its plugins/ directory.
+
+  See docs/05-unraid-plugin-conventions.md for the full checklist.
+-->
+<Plugin>
+  <PluginURL>https://github.com/zhz8888/unraid-plugin-komari-agent/releases/latest/download/unraid-plugin-komari-agent.plg</PluginURL>
+  <PluginAuthor>zhz8888</PluginAuthor>
+  <Beta>False</Beta>
+  <Category>Tools:System</Category>
+  <Name>Komari Agent</Name>
+  <Description>Run the Komari monitoring agent on Unraid as a managed service.</Description>
+  <Overview>
+    The Komari agent reports CPU, memory, disk, network throughput, load and
+    uptime to a Komari status panel over a WebSocket connection.
+
+    The agent is a long running daemon, and Unraid has none of what a daemon
+    needs: no systemd, no persistent /usr, no log rotation for a new service.
+    This plugin supplies that layer.
+
+    [b]Features:[/b]
+    - Starts on boot and stops cleanly on shutdown, through an rc script at /etc/rc.d/rc.komari-agent.
+    - A supervisor loop restarts the agent when it crashes.
+    - The binary is cached on the flash device and re-installed on every boot, because /usr is an overlay filesystem.
+    - Log rotation for /var/log/komari-agent.log, which lives on a tmpfs.
+    - A Settings page edits the configuration, restarts the agent and shows live status, including a panel connectivity probe.
+    - Traffic counters are persisted on flash, so they survive a reboot.
+
+    [b]Safe defaults:[/b]
+    - Panel-issued remote control (Web SSH and RCE) is disabled by default.
+    - The agent's built-in self-update is disabled by default, because the overlay filesystem would discard the result and it would bypass the pinned checksum.
+    - The agent token is passed through the environment only, never on a command line.
+
+    [b]Requirements:[/b]
+    - Unraid 7.0 or newer, x86_64
+    - An existing Komari panel and an agent token issued by it
+
+    The upstream binary is redistributed unmodified and is verified against a
+    pinned SHA256 on every build.
+  </Overview>
+  <Support>https://github.com/zhz8888/unraid-plugin-komari-agent/issues</Support>
+  <Project>https://github.com/zhz8888/unraid-plugin-komari-agent</Project>
+  <ReadMe>https://github.com/zhz8888/unraid-plugin-komari-agent/blob/main/README.md</ReadMe>
+  <License>https://github.com/zhz8888/unraid-plugin-komari-agent/blob/main/LICENSE</License>
+  <Icon>https://raw.githubusercontent.com/zhz8888/unraid-plugin-komari-agent/main/src/usr/local/emhttp/plugins/unraid-plugin-komari-agent/unraid-plugin-komari-agent.png</Icon>
+</Plugin>

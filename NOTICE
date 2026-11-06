@@ -1,0 +1,38 @@
+unraid-plugin-komari-agent
+Copyright (c) 2026 zhz8888
+
+This product bundles a binary distributed by the komari-monitor project:
+
+  komari-agent  (the Komari monitoring agent daemon)
+  Source:         https://github.com/komari-monitor/komari-agent
+  Upstream release: 1.5.11
+  License:        MIT
+  Redistributed as: komari-agent-linux-amd64
+                    cached on the flash device, installed as
+                    /usr/local/sbin/komari-agent
+                    inside unraid-plugin-komari-agent-<version>-x86_64-1.txz
+
+The binary is redistributed unmodified. It is downloaded byte for byte from the
+official GitHub Release asset
+
+  https://github.com/komari-monitor/komari-agent/releases/download/1.5.11/komari-agent-linux-amd64
+
+whose SHA256 is pinned in plugin/upstream.lock and verified against the
+downloaded bytes at build time:
+
+  78c28d89e523816baea010c0ed0714f245f508ffdaca0540f5c9f230f7053c8c  (12,585,218 bytes)
+
+No modifications are made to the upstream binary.
+
+MIT License:
+  https://opensource.org/licenses/MIT
+
+A copy of the upstream license is available at:
+  https://github.com/komari-monitor/komari-agent/blob/main/LICENSE
+
+The Komari panel server (komari-monitor/komari) is NOT distributed by this
+project. It is a separate application the user deploys, and it remains subject
+to its own license.
+
+This project's own scripts and documentation are licensed under the MIT
+License; see LICENSE.

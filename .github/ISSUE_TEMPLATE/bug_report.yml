@@ -1,0 +1,94 @@
+name: Bug report
+description: Report a problem with the plugin, its install scripts or the WebGUI page
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        **Before you continue:** if the problem is with `komari-agent` itself
+        (metrics are wrong, the panel rejects the connection, Web SSH does not
+        work), please report it upstream at
+        https://github.com/komari-monitor/komari-agent/issues — this repo only
+        packages that binary for Unraid.
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Shown at the top of the Settings → Komari Agent page.
+      placeholder: '20261106'
+    validations:
+      required: true
+
+  - type: input
+    id: unraid-version
+    attributes:
+      label: Unraid version
+      description: Output of `cat /etc/unraid-version`
+      placeholder: 'version="7.3.2"'
+    validations:
+      required: true
+
+  - type: input
+    id: agent-version
+    attributes:
+      label: Agent version
+      description: Shown on the Settings page, or in the first line of `/var/log/komari-agent.log`
+      placeholder: '1.5.11'
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: |
+        Paste the full command output. Useful commands:
+
+        - `/etc/rc.d/rc.komari-agent status`
+        - `tail -50 /var/log/komari-agent.log`
+        - `ps -ef | grep komari-agent`
+        - `ls -la /boot/config/plugins/unraid-plugin-komari-agent/`
+
+        **Remove the token** from `komari-agent.cfg` before pasting it.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have removed the agent token from any output I pasted.
+          required: true
+        - label: This is a packaging problem, not an `komari-agent` bug (those go upstream).
+          required: true

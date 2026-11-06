@@ -1,0 +1,42 @@
+# Upstream release lock for unraid-plugin-komari-agent.
+#
+# This file pins the exact komari-agent release asset that the plugin bundles.
+# scripts/build-plugin.sh reads it and verifies the downloaded bytes against
+# the SHA256 recorded here; scripts/update-upstream.sh refreshes it from the
+# GitHub Releases API.
+#
+# Why a lock file instead of querying the API on every build:
+#
+#   * Reproducibility. The build must not depend on what the API returns
+#     today. The lock file is part of the repository, so a checkout at a given
+#     commit always produces the same package.
+#   * Supply chain review. A new upstream version arrives as a diff to this
+#     file that a human reviews, not as an invisible change during CI.
+#   * Availability. The GitHub API is rate limited (60 requests per hour for
+#     an unauthenticated client) and is intermittently unreachable from some
+#     networks. A build that needs it fails for reasons that have nothing to
+#     do with the code.
+#
+# The digest value comes from the "digest" field of the release asset in the
+# GitHub Releases API response, which GitHub computes from the uploaded bytes.
+
+[meta]
+version = 1.5.11
+
+[amd64]
+name = komari-agent-linux-amd64
+size = 12585218
+sha256 = 78c28d89e523816baea010c0ed0714f245f508ffdaca0540f5c9f230f7053c8c
+url = https://github.com/komari-monitor/komari-agent/releases/download/1.5.11/komari-agent-linux-amd64
+
+[arm64]
+name = komari-agent-linux-arm64
+size = 11892529
+sha256 = ff8e33dc12ef2b5738fa291a58498bd15dcbf8ef51966ab65fd67679a0abc87d
+url = https://github.com/komari-monitor/komari-agent/releases/download/1.5.11/komari-agent-linux-arm64
+
+[386]
+name = komari-agent-linux-386
+size = 12198622
+sha256 = e12b0c2e617928bb4184ec8c06d68aeca7d2bd29cd8f74ad4317186c6ad2f1ed
+url = https://github.com/komari-monitor/komari-agent/releases/download/1.5.11/komari-agent-linux-386

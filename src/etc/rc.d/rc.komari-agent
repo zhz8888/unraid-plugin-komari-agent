@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# /etc/rc.d/rc.komari-agent -- start and stop the komari agent.
+#
+# This is the script Unraid's shutdown sequence and the WebGUI call, and it is
+# the one a user types by hand. It is a thin wrapper: everything that needs to
+# know about the configuration, the pidfile and the supervisor lives in the
+# plugin directory, so that the plugin can be reinstalled without this file
+# and this file can be recreated without the plugin.
+#
+# Usage:
+#   rc.komari-agent start
+#   rc.komari-agent stop
+#   rc.komari-agent restart
+#   rc.komari-agent status
+#
+# This script is part of the plugin's Slackware package and lives in /etc,
+# which is an overlay that is rebuilt on every boot; the package is
+# reinstalled at boot time, which puts this file back.
+#
+# It exits 0 in every case. Unraid's rc.6 does not inspect the status, but the
+# plugin installer does, and a non-zero exit there would abort the install and
+# unregister the plugin.
+
+PLUGIN_NAME="unraid-plugin-komari-agent"
+PLUGIN_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
+SCRIPTS="${PLUGIN_DIR}/scripts"
+
+usage() {
+  echo "usage: $0 {start|stop|restart|status}"
+}
+
+# The scripts in the plugin directory are the implementation. When they are
+# missing the package is half installed, which is worth saying out loud but
+# not worth failing for.
+if [ ! -d "${SCRIPTS}" ]; then
+  echo "[!] ${SCRIPTS} is missing; the ${PLUGIN_NAME} package is not installed correctly."
+  echo "    Reinstall the plugin from the Plugins page."
+  exit 0
+fi
+
+case "$1" in
+  start)
+    /bin/bash "${SCRIPTS}/start.sh"
+    ;;
+  stop)
+    /bin/bash "${SCRIPTS}/stop.sh"
+    ;;
+  restart)
+    /bin/bash "${SCRIPTS}/restart.sh"
+    ;;
+  status)
+    /bin/bash "${SCRIPTS}/status.sh" --text
+    ;;
+  *)
+    usage
+    ;;
+esac
+
+exit 0
