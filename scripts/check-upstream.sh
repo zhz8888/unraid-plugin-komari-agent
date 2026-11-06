@@ -98,7 +98,7 @@ api_get() {
     return 0
   fi
 
-  local py_error
+  local py_error py_status
   if py_error=$("${PYTHON}" - "$url" "$out" <<'PY'
 import os
 import sys
@@ -135,12 +135,12 @@ except urllib.error.HTTPError as error:
         pass
     # 403 with a rate limit message and 429 are not "the thing is missing".
     if error.code == 429 or (error.code == 403 and "rate limit" in body.lower()):
-        sys.stderr.write("RATE_LIMIT HTTP %s\n" % error.code)
+        print("RATE_LIMIT HTTP %s" % error.code)
         sys.exit(3)
-    sys.stderr.write("HTTP %s\n" % error.code)
+    print("HTTP %s" % error.code)
     sys.exit(2)
 except Exception as error:  # noqa: BLE001 - the message is what matters
-    sys.stderr.write("%s\n" % error)
+    print("%s" % error)
     sys.exit(4)
 
 with open(out_path, "wb") as handle:
@@ -148,12 +148,17 @@ with open(out_path, "wb") as handle:
 PY
   ); then
     return 0
+  else
+    # $? has to be read here. Once the `if` compound statement completes,
+    # $? is the status of the `if` itself, which is always 0, so reading it
+    # below would make every failure fall through to the network case.
+    py_status=$?
   fi
 
-  case $? in
-    2) API_ERROR_KIND="http";      API_ERROR="HTTP error: ${py_error}" ;;
+  case "${py_status}" in
+    2) API_ERROR_KIND="http";       API_ERROR="HTTP error: ${py_error}" ;;
     3) API_ERROR_KIND="rate_limit"; API_ERROR="API rate limit reached: ${py_error}" ;;
-    *) API_ERROR_KIND="network";   API_ERROR="network error: ${py_error}" ;;
+    *) API_ERROR_KIND="network";    API_ERROR="network error: ${py_error}" ;;
   esac
   return 1
 }
