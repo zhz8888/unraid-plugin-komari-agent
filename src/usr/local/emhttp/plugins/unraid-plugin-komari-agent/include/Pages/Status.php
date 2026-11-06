@@ -74,7 +74,7 @@ $actionEndpoint = '/plugins/' . KOMARI_PLUGIN_NAME . '/include/data/Action.php';
     .komari-muted { opacity: 0.7; }
 </style>
 
-<?php if (!$cfg['ENABLED']) { ?>
+<?php if (!komari_bool($cfg['ENABLED'])) { ?>
 <div class="notice">
     <strong>The agent is disabled.</strong>
     It will not be started at boot. Turn it on in the Settings tab when you want
