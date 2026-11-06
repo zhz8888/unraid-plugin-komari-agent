@@ -336,6 +336,20 @@ rotate_log_if_needed() {
 }
 
 # json_str VALUE -- prints VALUE as a JSON string literal.
+#
+# The input is a line of agent log output, so it can contain any byte the
+# panel ever sent back. Two classes of byte break the document even after
+# the quote and backslash escapes below:
+#
+#   * control characters U+0000..U+001F, which JSON forbids unescaped. A
+#     single \x01 in a log line made status.sh emit invalid JSON, and the
+#     status endpoint then reported "not valid JSON" for the whole page.
+#   * bytes that are not valid UTF-8, which json_decode() rejects outright.
+#
+# Both are dropped rather than encoded: the log tail is a convenience view,
+# and losing a stray control byte is better than losing the entire page.
+# Non-ASCII text is kept as is, which is correct because the page declares
+# UTF-8 and valid multi-byte sequences survive the filter untouched.
 json_str() {
   local s="$1"
   s="${s//\\/\\\\}"
@@ -343,6 +357,14 @@ json_str() {
   s="${s//$'\t'/}"
   s="${s//$'\n'/}"
   s="${s//$'\r'/}"
+  # Drop the remaining C0 controls and DEL.
+  s="$(printf '%s' "${s}" | tr -d '\000-\010\013\014\016-\037\177')"
+  # Drop anything that is not valid UTF-8. iconv -c removes exactly the
+  # invalid sequences and leaves valid multi-byte characters alone; when
+  # iconv is missing the step is skipped rather than failing the script.
+  if command -v iconv >/dev/null 2>&1; then
+    s="$(printf '%s' "${s}" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)" || true
+  fi
   printf '"%s"' "${s}"
 }
 

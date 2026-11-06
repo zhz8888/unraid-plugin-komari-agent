@@ -69,7 +69,12 @@ function komari_status_snapshot()
         );
     }
 
-    $data = json_decode($raw, true);
+    // JSON_INVALID_UTF8_SUBSTITUTE is the backstop for the one thing status.sh
+    // cannot guarantee: a log line whose bytes are not valid UTF-8. lib.sh
+    // filters those with iconv when it is installed, but iconv is not part of a
+    // minimal Unraid install, so the decoder has to tolerate the remaining case
+    // instead of rejecting the whole document and blanking the page.
+    $data = json_decode($raw, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
     if (!is_array($data)) {
         return array(
             'ok' => false,
