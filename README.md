@@ -287,8 +287,10 @@ git clone https://github.com/zhz8888/unraid-plugin-komari-agent.git
 cd unraid-plugin-komari-agent
 
 make build     # download -> verify SHA256 -> assemble txz -> render .plg
-make lint      # static checks on the .plg and the WebGUI sources
+make lint      # source tree checks, .plg checks, WebGUI sources
 make verify    # hash and layout verification
+make smoke     # run the packaged scripts under a fake root
+make ci        # all of the above, in the order the build workflow runs them
 
 ls dist/
 # unraid-plugin-komari-agent-20261106-x86_64-1.txz   <- Slackware package
@@ -296,10 +298,41 @@ ls dist/
 # unraid-plugin-komari-agent-proxy.plg               <- mirrored variant
 ```
 
-### Checking for an upstream update
+### Continuous integration
 
-The nightly `upstream-check` workflow runs `scripts/check-upstream.sh`, and the
-script runs locally with the same semantics:
+Two workflows:
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| [`build.yml`](.github/workflows/build.yml) | `main`, tags, pull requests, manual | Runs the whole check suite, builds the package, and — on a tag — publishes it to the GitHub release. |
+| [`upstream-check.yml`](.github/workflows/upstream-check.yml) | nightly, or manual | Reports a newer upstream `komari-agent` release and opens an issue. |
+
+`build.yml` has two jobs. `verify` runs the checks and builds the package on
+every trigger. `release` runs only for a tag, and publishes the **exact bytes**
+`verify` produced rather than rebuilding — what was tested is what ships, and the
+two cannot drift apart between jobs. It re-checks the checksum the `.plg` pins
+against the package it is about to attach, because a release whose pinned hash
+does not match its asset would install on nobody's machine.
+
+A tag is therefore the only thing that publishes, and it cannot publish anything
+that did not pass the same checks a pull request passes.
+
+No logic is inlined in the workflow files — every step calls a script from
+`scripts/`, and the same scripts are what `CONTRIBUTING.md` tells a contributor
+to run locally. That is what makes "it passes locally" and "it passes in CI" the
+same statement. The two checks that are hardest to reproduce by hand are worth
+naming:
+
+- **Reproducibility.** The package is rebuilt in place and again from a clone at
+  a different path, and the step fails if the bytes differ. A build that depends
+  on the checkout path is not reproducible, and the path leaks in through a file
+  name or a timestamp.
+- **Upstream pin coherence.** `plugin/upstream.lock`, the `Makefile` and
+  `scripts/build-plugin.sh` all carry the pinned version. `scripts/lint-repo.sh`
+  fails when they disagree, which is the most likely mistake when the upstream
+  version is bumped by hand.
+
+To check for an upstream update yourself:
 
 ```bash
 ./scripts/check-upstream.sh              # human readable report
@@ -541,13 +574,14 @@ need verification on a real Unraid host.
 │   ├── fetch-plugin.sh                    # download + verify only (audit)
 │   ├── update-upstream.sh                 # refresh plugin/upstream.lock
 │   ├── check-upstream.sh                  # is a newer upstream release out?
+│   ├── lint-repo.sh                       # source tree checks, no build needed
 │   ├── lint-plg.sh                        # static checks on the generated .plg
 │   ├── check-php-syntax.py                # syntax check on the WebGUI sources
 │   ├── smoke-test.sh                      # run the packaged scripts under a fake root
 │   ├── make-icon.py                       # regenerate the plugin icon
 │   └── verify-release.sh                  # verify hashes and layout
 └── .github/
-    ├── workflows/build.yml                # CI: build, lint, verify, reproducibility
+    ├── workflows/build.yml                # checks, build, and release on a tag
     ├── workflows/upstream-check.yml       # daily upstream version check
     ├── ISSUE_TEMPLATE/
     └── pull_request_template.md

@@ -38,6 +38,24 @@ If you are modifying the packaging:
 
 - [`../README.md`](../README.md) — project overview (English)
 - [`../README.zh-CN.md`](../README.zh-CN.md) — project overview (Chinese)
-- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — development setup and PR checklist
+- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — development setup, the check
+  matrix (which command covers what, and which need the network or a build), and
+  the PR checklist
 - [`../SECURITY.md`](../SECURITY.md) — reporting vulnerabilities, security defaults
 - [`../CHANGELOG.md`](../CHANGELOG.md) — release history
+
+## Checks, and where their logic lives
+
+The workflows contain no logic. Every step calls a script, so the same
+commands run on a contributor's machine and on a runner:
+
+| Script | Workflow that calls it |
+|---|---|
+| [`../scripts/lint-repo.sh`](../scripts/lint-repo.sh) | `build.yml` (verify job) |
+| [`../scripts/check-php-syntax.py`](../scripts/check-php-syntax.py) | `build.yml` (verify job) |
+| [`../scripts/build-plugin.sh`](../scripts/build-plugin.sh) | `build.yml` (verify job) |
+| [`../scripts/lint-plg.sh`](../scripts/lint-plg.sh) | `build.yml` (verify job) |
+| [`../scripts/verify-release.sh`](../scripts/verify-release.sh) | `build.yml` (verify job) |
+| [`../scripts/smoke-test.sh`](../scripts/smoke-test.sh) | `build.yml` (verify job) |
+| [`../scripts/check-upstream.sh`](../scripts/check-upstream.sh) | `upstream-check.yml` |
+| [`../scripts/update-upstream.sh`](../scripts/update-upstream.sh) | maintainer tool, not run in CI |

@@ -262,8 +262,10 @@ git clone https://github.com/zhz8888/unraid-plugin-komari-agent.git
 cd unraid-plugin-komari-agent
 
 make build     # 下载 -> 校验 SHA256 -> 组装 txz -> 渲染 .plg
-make lint      # 对 .plg 与 WebGUI 源码做静态检查
+make lint      # 源码树检查、.plg 检查、WebGUI 源码检查
 make verify    # 校验哈希与包内结构
+make smoke     # 在假根目录下跑一遍包内脚本
+make ci        # 以上全部，顺序与 build 工作流一致
 
 ls dist/
 # unraid-plugin-komari-agent-20261106-x86_64-1.txz   <- Slackware 安装包
@@ -271,10 +273,33 @@ ls dist/
 # unraid-plugin-komari-agent-proxy.plg               <- 代理版
 ```
 
-### 检查上游更新
+### 持续集成
 
-每日的 `upstream-check` 工作流调用 `scripts/check-upstream.sh`，该脚本在本地
-运行时的语义完全相同：
+两个工作流：
+
+| 工作流 | 触发条件 | 作用 |
+|---|---|---|
+| [`build.yml`](.github/workflows/build.yml) | `main`、tag、PR、手动 | 跑完整检查套件、构建产物；**tag 时**把产物发布到 GitHub Release |
+| [`upstream-check.yml`](.github/workflows/upstream-check.yml) | 每日定时、手动 | 检查上游 `komari-agent` 是否有新版本，有则开 issue |
+
+`build.yml` 有两个作业。`verify` 在每次触发时跑检查并构建产物；`release` 只在 tag 时运行，
+发布的是 `verify` 产出的**同一份字节**，而不是重新构建——测过什么就发什么，两个作业之间
+不会出现漂移。发布前它还会再核对一次 `.plg` 里钉的校验和与即将上传的包是否一致：
+钉的哈希和资产对不上，装到谁机器上都会失败。
+
+所以**只有打 tag 才会发布**，而 tag 无法发布任何没通过 PR 同等检查的东西。
+
+工作流里**不内联任何逻辑**——每一步都调用 `scripts/` 下的脚本，而这些脚本正是
+`CONTRIBUTING.md` 让贡献者在本地跑的那几条。这样"本地通过"和"CI 通过"才是同一句话。
+其中最难靠手工复现的两项值得单独说明：
+
+- **可复现性**：会原地重建一次，再从**另一个路径**的克隆重建一次，字节不同就失败。
+  依赖检出路径的构建不是可复现的，而路径会通过文件名或时间戳漏进包里。
+- **上游 pin 一致性**：`plugin/upstream.lock`、`Makefile`、`scripts/build-plugin.sh`
+  三处都带着钉住的版本号。`scripts/lint-repo.sh` 在它们不一致时失败——这正是手工
+  升级上游版本时最容易犯的错。
+
+自己检查上游有没有新版本：
 
 ```bash
 ./scripts/check-upstream.sh              # 人类可读报告
@@ -496,7 +521,7 @@ pull request 里，而不是在 CI 期间悄悄发生。
 │   ├── make-icon.py                       # 重新生成插件图标
 │   └── verify-release.sh                  # 校验哈希与包内结构
 └── .github/
-    ├── workflows/build.yml                # CI：构建、lint、verify、可复现性校验
+    ├── workflows/build.yml                # 检查、构建，tag 时发布
     ├── workflows/upstream-check.yml       # 每日检查上游新版本
     ├── ISSUE_TEMPLATE/
     └── pull_request_template.md

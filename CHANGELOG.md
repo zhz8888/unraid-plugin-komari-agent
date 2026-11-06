@@ -64,6 +64,12 @@ on the WebGUI page.
   telling a maintainer their pin is wrong when the real problem is a 403 sends
   them looking in the wrong place. Exit status `0` means the check completed,
   whether or not an upgrade exists.
+- `scripts/lint-repo.sh` — repository level checks that need neither the network
+  nor a build: shell syntax of every script, the two rules that would abort an
+  install (non-zero exit, shell error mode), LF line endings, the upstream pin
+  agreeing across `plugin/upstream.lock`, the `Makefile` and
+  `scripts/build-plugin.sh`, the workflow and issue template YAML, and the CA
+  metadata.
 - `docs/05-unraid-plugin-conventions.md` — rule by rule mapping of the official
   Unraid plugin rules onto this plugin
 
@@ -77,6 +83,20 @@ on the WebGUI page.
   logic. It schedules `scripts/check-upstream.sh`, turns its exit status into a
   red run, writes a job summary, and opens the issue from a body the script
   generated next to the comparison it describes.
+- `.github/workflows/build.yml` carries the whole pipeline: its `verify` job runs
+  the static checks, the build, the `.plg` lint, the artifact verification, the
+  fake-root smoke test and the two reproducibility checks on every trigger, and
+  its `release` job publishes on a tag. The checks live in the same file as the
+  release so that a tag cannot reach the release path without passing the same
+  checks a pull request does.
+- The release job publishes the artifacts `verify` produced instead of rebuilding
+  them, so what was tested is what ships and the two jobs cannot drift apart. It
+  re-checks the checksum the `.plg` pins against the package it attaches.
+- No logic is inlined in any workflow. Every step calls a script from `scripts/`,
+  and the same commands are what `CONTRIBUTING.md` tells a contributor to run
+  locally, so "it passes locally" and "it passes in CI" are the same statement.
+- `make lint` now also runs `scripts/lint-repo.sh`, and `make ci` runs exactly
+  what the `verify` job of `build.yml` runs, in the same order.
 - `DISABLE_AUTO_UPDATE` defaults to `1`. The agent's built-in updater overwrites
   its own executable in place, which the overlay filesystem throws away on the
   next reboot, and which bypasses the checksum the plugin pins.

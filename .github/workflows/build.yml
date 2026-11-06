@@ -1,5 +1,20 @@
 name: build
 
+# One workflow, two jobs.
+#
+#   verify   runs on every branch push, every pull request, every tag and on
+#            demand. It runs the whole check suite and builds the package.
+#   release  runs only for a tag, and publishes the exact bytes `verify`
+#            produced. It does not rebuild: what was tested is what ships.
+#
+# The checks live here rather than in a separate CI workflow so that one file
+# describes the whole pipeline, and a tag cannot reach the release path without
+# having passed the same checks a pull request does.
+#
+# No logic is inlined. Every step calls a script from scripts/, and the same
+# commands are what CONTRIBUTING.md tells a contributor to run locally, so "it
+# passes locally" and "it passes in CI" are the same statement.
+
 on:
   push:
     branches: [main]
@@ -9,27 +24,41 @@ on:
   workflow_dispatch:
     inputs:
       plugin_version:
-        description: 'Plugin version (YYYYMMDD, or YYYYMMDD.a for a second release on the same day); defaults to a fixed value'
+        description: 'Plugin version (YYYYMMDD, or YYYYMMDD.a for a second release on the same day); leave empty to use the tag, or a fixed value off-tag'
         required: false
       upstream_version:
-        description: 'komari-agent version to bundle; leave empty to use the version pinned in scripts/build-plugin.sh'
+        description: 'komari-agent version to bundle; leave empty to use the version pinned in plugin/upstream.lock'
         required: false
 
 permissions:
   contents: read
+
+concurrency:
+  # A newer push to the same ref supersedes an in-flight run, because a stale
+  # run reporting a stale result is worse than no run at all. A tag is the
+  # exception: a release build must be allowed to finish, or the published
+  # assets and the tag could disagree.
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   verify:
     name: Build and verify
     runs-on: ubuntu-latest
     env:
-      # A fixed plugin version keeps the build reproducible: the version is
-      # part of the package name, so a moving timestamp would change the
-      # artifact between the builds that are compared below.
-      PLUGIN_VERSION: ${{ github.event.inputs.plugin_version || '20260101' }}
-      # Empty means "use the default of scripts/build-plugin.sh", which is the
-      # one place the bundled version is pinned. A copy here would be a second
-      # source of truth and could drift away from the upstream check.
+      # Three sources, in order of precedence:
+      #
+      #   1. an explicit workflow_dispatch input
+      #   2. the git tag, because the .plg points at the release asset under
+      #      that tag, so the two have to be the same string
+      #   3. a fixed value off-tag, which keeps the build reproducible: the
+      #      version is part of the package name, so a moving timestamp would
+      #      make two builds of the same tree differ for a reason that has
+      #      nothing to do with the code under test
+      PLUGIN_VERSION: ${{ github.event.inputs.plugin_version || (startsWith(github.ref, 'refs/tags/') && github.ref_name || '20260101') }}
+      # Empty means "use the version pinned in plugin/upstream.lock", which is
+      # the single source of truth. A copy here would be a second one that can
+      # drift away from the lock file and the upstream check.
       #
       # This has to live at job level, not on the build step: the two
       # reproducibility steps below rebuild the package, and if they saw a
@@ -46,90 +75,164 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Build the plugin
-        run: ./scripts/build-plugin.sh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install the YAML parser
+        # scripts/lint-repo.sh validates the workflow files and the issue
+        # templates with PyYAML. The script skips that check when the module is
+        # missing, so installing it here is what makes the check actually run.
+        run: python3 -m pip install --quiet --disable-pip-version-check pyyaml
 
-      - name: Lint the generated .plg
-        run: ./scripts/lint-plg.sh
+      # ---------------------------------------------------------- static checks
+      # These need neither the network nor a build, so they fail fast and
+      # specifically before anything is downloaded.
+
+      - name: Repository checks
+        # Shell syntax of every script, the two rules that would abort an
+        # install (non-zero exit, shell error mode), LF line endings, the
+        # upstream pin agreeing across plugin/upstream.lock, the Makefile and
+        # scripts/build-plugin.sh, the hand edited YAML, and the CA metadata.
+        run: ./scripts/lint-repo.sh
 
       - name: Check the WebGUI sources
         run: ./scripts/check-php-syntax.py src/
 
-      - name: Verify artifacts
+      # ------------------------------------------------------------ build checks
+
+      - name: Build the plugin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/build-plugin.sh
+
+      - name: Lint the generated .plg
+        run: ./scripts/lint-plg.sh
+
+      - name: Verify the artifacts
+        # Checks the pinned checksums, the archive member names (a backslash
+        # would make GNU tar extract flat files named that), the file modes (a
+        # Windows checkout reports no execute bit), the launch target and icon,
+        # and the CA wrapper's pluginURL against the rendered .plg.
         run: ./scripts/verify-release.sh
 
-      - name: Check reproducibility (same tree)
+      - name: Run the packaged scripts under a fake root
+        run: ./scripts/smoke-test.sh
+
+      - name: The package is byte-identical when rebuilt in place
         run: |
           set -euo pipefail
           BEFORE=$(sha256sum dist/*.txz | awk '{print $1}')
           ./scripts/build-plugin.sh
           AFTER=$(sha256sum dist/*.txz | awk '{print $1}')
           if [ "$BEFORE" != "$AFTER" ]; then
-            echo "::error::build is not reproducible ($BEFORE != $AFTER)"
+            echo "::error::the build is not reproducible ($BEFORE != $AFTER)"
             exit 1
           fi
-          echo "reproducible build: $AFTER"
+          echo "reproducible in place: $AFTER"
 
-      - name: Check reproducibility (from a fresh clone)
+      - name: The package is byte-identical when built from a copy elsewhere
         run: |
           set -euo pipefail
+          # A build that depends on the checkout path is not reproducible: the
+          # path leaks into the archive through a file name or a timestamp. This
+          # is the check that catches it, and it is why the archive is written
+          # by Python's tarfile rather than by the host tar.
           HERE=$(sha256sum dist/*.txz | awk '{print $1}')
           git clone --quiet . /tmp/rebuild-check
           ( cd /tmp/rebuild-check && ./scripts/build-plugin.sh )
           THERE=$(sha256sum /tmp/rebuild-check/dist/*.txz | awk '{print $1}')
           if [ "$HERE" != "$THERE" ]; then
-            echo "::error::build depends on the checkout location ($HERE != $THERE)"
+            echo "::error::the build depends on the checkout location ($HERE != $THERE)"
             exit 1
           fi
           echo "reproducible across checkouts: $THERE"
 
-      - name: Upload artifacts
+      - name: Report the result in the job summary
+        run: |
+          set -euo pipefail
+          {
+            echo "## Build"
+            echo
+            echo "Plugin version: \`${PLUGIN_VERSION}\`"
+            echo
+            echo "| Artifact | Size | SHA256 |"
+            echo "|---|---|---|"
+            for f in dist/*.txz dist/*.plg; do
+              printf '| `%s` | %s bytes | `%s` |\n' \
+                "$(basename "$f")" \
+                "$(stat -c %s "$f")" \
+                "$(sha256sum "$f" | awk '{print $1}')"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the artifacts
         uses: actions/upload-artifact@v4
         with:
-          # Only the package is uploaded. The .plg of a non-release build
-          # points at a release tag that does not exist (PLUGIN_VERSION is the
-          # fixed build version), so installing that artifact would fail with
-          # a download error. The release job below rebuilds the installable
-          # .plg from the git tag it publishes.
+          # Both files are uploaded, not just the package. The release job
+          # publishes these exact bytes instead of rebuilding, so what was
+          # verified is what ships. On a tag the .plg points at the release
+          # asset under that same tag, which is why PLUGIN_VERSION resolves to
+          # the tag name above.
           name: unraid-plugin-komari-agent
-          path: dist/*.txz
+          path: |
+            dist/*.txz
+            dist/*.plg
           if-no-files-found: error
+          retention-days: 7
 
   release:
-    name: Attach artifacts to release
+    name: Publish release
     needs: verify
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    env:
-      # The tag is the plugin version. The .plg points at the release asset
-      # under the same tag, so both have to agree.
-      PLUGIN_VERSION: ${{ github.ref_name }}
-      # Same rule as above: the build script owns the pinned version, so an
-      # empty value means "use its default".
-      KOMARI_VERSION: ${{ github.event.inputs.upstream_version }}
-      KOMARI_ARCH: amd64
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Download the verified artifacts
+        uses: actions/download-artifact@v4
         with:
-          python-version: '3.x'
+          name: unraid-plugin-komari-agent
+          path: dist
 
-      - name: Build with the tag version
-        run: ./scripts/build-plugin.sh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check the artifact checksums before publishing
+        run: |
+          set -euo pipefail
+          # The .plg pins the SHA256 of the package it downloads. If the two do
+          # not agree the release would be published but every install would
+          # fail with a hash mismatch, so this is verified once more, here,
+          # against the files that are about to be attached.
+          python3 - <<'PY'
+          import glob
+          import hashlib
+          import sys
+          import xml.etree.ElementTree as ET
 
-      - name: Lint the release artifacts
-        run: ./scripts/lint-plg.sh
+          problems = []
 
-      - name: Verify the release artifacts
-        run: ./scripts/verify-release.sh
+          for plg in sorted(glob.glob('dist/*.plg')):
+              root = ET.parse(plg).getroot()
+              for entry in root.findall('FILE'):
+                  url = (entry.findtext('URL') or '').strip()
+                  expected = (entry.findtext('SHA256') or '').strip().lower()
+                  if not url.endswith('.txz'):
+                      continue
+                  name = url.rsplit('/', 1)[-1]
+                  path = 'dist/' + name
+                  try:
+                      with open(path, 'rb') as handle:
+                          actual = hashlib.sha256(handle.read()).hexdigest()
+                  except OSError as error:
+                      problems.append('%s: %s' % (plg, error))
+                      continue
+                  if actual != expected:
+                      problems.append('%s expects %s for %s, got %s'
+                                      % (plg, expected, name, actual))
+
+          if problems:
+              for problem in problems:
+                  print('::error::' + problem)
+              sys.exit(1)
+          print('the .plg files pin the checksum of the attached package')
+          PY
+
+          ls -la dist/
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

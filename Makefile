@@ -25,7 +25,7 @@ ICON     := src/usr/local/emhttp/plugins/$(PLUGIN_NAME)/$(PLUGIN_NAME).png
 
 export PYTHON
 
-.PHONY: all build lint verify smoke check fetch icon clean distclean release help
+.PHONY: all build lint verify smoke check ci fetch icon clean distclean release help
 
 all: build lint verify
 
@@ -35,6 +35,7 @@ build:
 
 ## lint: static checks on the generated .plg and on the WebGUI sources
 lint:
+	./scripts/lint-repo.sh
 	./scripts/lint-plg.sh
 	$(PYTHON) scripts/check-php-syntax.py src/
 
@@ -49,6 +50,11 @@ smoke:
 ## check: is there a newer upstream komari-agent release? (needs network)
 check:
 	./scripts/check-upstream.sh
+
+## ci: exactly what the verify job of the build workflow runs, in order
+ci: lint build verify smoke
+	@echo
+	@echo "  ci checks passed"
 
 ## fetch: download and unpack the upstream binary only (audit/debug)
 fetch:

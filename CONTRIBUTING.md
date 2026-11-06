@@ -45,13 +45,27 @@ git clone https://github.com/zhz8888/unraid-plugin-komari-agent.git
 cd unraid-plugin-komari-agent
 
 ./scripts/build-plugin.sh     # build dist/
+./scripts/lint-repo.sh        # source tree checks, no network, no build
 ./scripts/lint-plg.sh         # static checks on the generated .plg
 "$PYTHON" scripts/check-php-syntax.py src/   # WebGUI source check
 ./scripts/verify-release.sh   # hash + layout verification
+./scripts/smoke-test.sh       # run the packaged scripts under a fake root
 ```
 
-`make build`, `make lint` and `make verify` are the same three steps. `make help`
+`make build`, `make lint` and `make verify` are the same steps, and `make ci`
+runs the whole sequence the `build` workflow runs, in the same order. `make help`
 lists every target.
+
+### What each check covers
+
+| Command | Needs network | Needs a build | Covers |
+|---|---|---|---|
+| `scripts/lint-repo.sh` | no | no | Shell syntax of every script; the two rules that would abort an install (non-zero exit, shell error mode); LF line endings; the upstream pin agreeing across `plugin/upstream.lock`, the `Makefile` and `scripts/build-plugin.sh`; the workflow and issue template YAML; the CA metadata |
+| `scripts/check-php-syntax.py` | no | no | The WebGUI PHP and `.page` files, plus a cross-check that every `ka_*` helper called is actually declared |
+| `scripts/lint-plg.sh` | no | yes | The rendered `.plg`: XML shape, entity expansion, version scheme, `<FILE>` checksums, `<INLINE>` bash syntax, the no-non-zero-exit rule, leftover placeholders, token on the command line |
+| `scripts/verify-release.sh` | no | yes | The built artifacts: txz checksum against the `.plg`, POSIX archive member names, file modes, launch target and icon resolution, `plugin.info` agreement, CA wrapper `pluginURL` against the `.plg` |
+| `scripts/smoke-test.sh` | no | yes | Unpacks the package and runs `start.sh` / `stop.sh` / `status.sh` under a fake root with a stub agent |
+| `scripts/check-upstream.sh` | **yes** | no | Whether the pin is coherent, and whether a newer upstream release exists |
 
 ### Checking for an upstream update
 
@@ -106,11 +120,17 @@ already installed it.
 
 ## Before opening a pull request
 
-Run all three checks and make sure they pass:
+Run the checks and make sure they pass:
 
 ```bash
-make build && make lint && make verify
+make ci
 ```
+
+That is exactly what the `verify` job of the `build` workflow runs:
+`lint-repo.sh`, `check-php-syntax.py`, the build, `lint-plg.sh`,
+`verify-release.sh`, `smoke-test.sh` and the two reproducibility checks. Running
+it locally first is the difference between a green PR and a round of review
+comments about a missing `set -e`.
 
 The build assembles the Slackware package from `src/` plus the upstream binary
 and produces **two** plugin files from the single template
@@ -182,7 +202,8 @@ an invisible change during CI.
 2. Update the pin in `Makefile` (`KOMARI_VERSION ?=`) and in
    `scripts/build-plugin.sh` (`KOMARI_VERSION="${KOMARI_VERSION:-...}"`). The two
    must agree with the lock file; the build fails with an explicit message when
-   they do not, and `scripts/check-upstream.sh` fails the scheduled run as well.
+   they do not, `scripts/lint-repo.sh` fails in CI, and `scripts/check-upstream.sh`
+   fails the scheduled run as well.
 3. Confirm the pin is coherent before building:
    ```bash
    ./scripts/check-upstream.sh
