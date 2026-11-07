@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   so putting them first costs nothing and keeps the generated block clean.
 -->
 
+[20261107]: https://github.com/zhz8888/unraid-plugin-komari-agent/releases/tag/20261107
 [20261106]: https://github.com/zhz8888/unraid-plugin-komari-agent/releases/tag/20261106
 
 The **plugin version** is the release date, `YYYYMMDD`. When more than one release
@@ -32,6 +33,29 @@ because the byte `1` is less than `9`, and Unraid would refuse the upgrade.
 The **upstream version** (the bundled `komari-agent` release) is tracked
 separately and is recorded in `plugin.info`, in the `.plg`'s `upstream` entity and
 on the WebGUI page.
+
+## [20261107] - 2026-11-07
+
+Bundles `komari-agent` 1.5.11, unchanged from the previous release. This release
+changes the plugin icon only.
+
+### Changed
+
+- The plugin icon is now the official Komari mascot instead of a drawing of our
+  own. The previous icon was a blue rounded square with a heartbeat trace: it
+  read as a generic monitoring plugin rather than as Komari, so a user who
+  already runs a Komari panel had no visual cue that this plugin belongs to it.
+  The Plugins tab now shows the same mark as the panel.
+- `scripts/make-icon.py` fetches the upstream asset instead of drawing it. The
+  source is `komari-monitor/komari-web` at a pinned commit, so the icon cannot
+  change under a build that did not, and re-running the script reproduces the
+  committed PNG byte for byte.
+- `icon.svg` is removed. The upstream mark is a raster illustration, and tracing
+  it into vector paths would produce a different picture rather than the
+  official one, so `ca_profile.xml` now points at the same PNG the package
+  ships.
+- `NOTICE` records the icon's upstream source, the pinned commit and its MIT
+  licence.
 
 ## [20261106] - 2026-11-06
 
