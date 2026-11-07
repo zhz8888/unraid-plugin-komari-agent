@@ -24,7 +24,7 @@
     contains the plugin definition, the Slackware packaging, the WebGUI pages
     and the build and verification scripts.
   </Profile>
-  <Icon>https://raw.githubusercontent.com/zhz8888/unraid-plugin-komari-agent/main/icon.svg</Icon>
+  <Icon>https://raw.githubusercontent.com/zhz8888/unraid-plugin-komari-agent/main/src/usr/local/emhttp/plugins/unraid-plugin-komari-agent/unraid-plugin-komari-agent.png</Icon>
   <WebPage>https://github.com/zhz8888/unraid-plugin-komari-agent</WebPage>
   <!--
     A forum thread is required before the plugin can be listed in Community

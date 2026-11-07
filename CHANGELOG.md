@@ -55,7 +55,9 @@ Packaging and service management:
 - `/etc/logrotate.d/komari-agent` -- the log lives on a 128 MB tmpfs and has to
   be rotated
 - Plugin icon and a `README.md` in the plugin directory, so the Plugins tab shows
-  a real icon and a real description
+  a real icon and a real description. The icon is the upstream Komari mascot,
+  fetched from `komari-monitor/komari-web` at a pinned commit by
+  `scripts/make-icon.py`, so the Plugins tab shows the same mark as the panel
 - Mirrored plugin file `unraid-plugin-komari-agent-proxy.plg` for networks that
   cannot reach GitHub. It installs the identical package, with the same SHA256,
   but downloads it through `https://gh-proxy.org/`
@@ -102,7 +104,8 @@ Build and verification tooling:
   on an unset variable, a config reader that cannot parse what the WebGUI writes,
   a start script that starts two instances, a stop script that leaves a process
   behind
-- `scripts/make-icon.py` -- regenerates the plugin icon
+- `scripts/make-icon.py` -- fetches the upstream Komari icon and writes the
+  256x256 PNG the package ships
 
 Repository, CI and documentation:
 

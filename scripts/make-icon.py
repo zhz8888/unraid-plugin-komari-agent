@@ -1,124 +1,70 @@
 #!/usr/bin/env python3
-"""Generate the plugin icon.
+"""Fetch the official Komari icon and write the plugin icon.
 
-The icon is a source asset of the repository, but it is generated rather than
-drawn by hand so that it stays reproducible and reviewable: the drawing code is
-the specification, and the PNG is what the Unraid WebGUI actually renders.
+The plugin icon is the upstream Komari mascot, not a drawing of our own: the
+Plugins tab should show the same mark the panel does, so that a user who knows
+Komari recognises the plugin at a glance. The image is therefore fetched from
+the upstream repository rather than generated, and this script exists so that
+the step is reproducible and reviewable instead of "someone saved a PNG once".
 
-The image is drawn at four times the target size and downsampled with Lanczos.
-Pillow has no antialiasing for lines and polygons, so drawing at 256x256
-directly produces visibly jagged strokes on the diagonal of the heartbeat
-trace. The supersampled result is identical in composition and smooth on screen.
+Source
+    komari-monitor/komari-web, public/assets/pwa-icon.webp -- the 512x512
+    icon the panel ships as its PWA icon. It is the highest resolution copy of
+    the mark that upstream publishes, which is what makes a clean 256x256
+    downsample possible.
 
-The shape matches icon.svg: a rounded square in a blue vertical gradient, three
-faint horizontal rules and a heartbeat trace across the middle.
+    The file is pinned to a commit, not to a branch. A branch would let the
+    icon change under a build that did not, and the package is meant to be
+    reproducible.
 
-Usage:
+Licence
+    The upstream Komari project is MIT licensed, and the icon is redistributed
+    unmodified apart from the downscale. See NOTICE for the attribution.
+
+Usage
     python3 scripts/make-icon.py [output.png]
+
+    Needs Pillow and network access. The committed PNG is the artifact; this
+    script only regenerates it.
 """
 
+import io
 import os
 import sys
+import urllib.request
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
+# Pinned to a commit so the icon cannot change under a build that did not.
+# Bump this deliberately, in its own commit, and re-run the script.
+SOURCE_COMMIT = "aa4e78bb40c2fc5569af065b7999a33e1bab1374"
+SOURCE_PATH = "public/assets/pwa-icon.webp"
+SOURCE_URL = (
+    "https://raw.githubusercontent.com/komari-monitor/komari-web/"
+    + SOURCE_COMMIT + "/" + SOURCE_PATH
+)
+
+# The size the Unraid WebGUI renders in the Plugins tab. The source is 512x512,
+# so this is a clean 2:1 downsample with Lanczos.
 SIZE = 256
-SCALE = 4
-RADIUS = 44
-
-# The gradient runs from a lighter blue at the top to a deep blue at the
-# bottom. It is dark enough for the white trace to stay readable at the 32 pixel
-# size the Plugins tab uses.
-TOP = (46, 123, 246)
-BOTTOM = (18, 58, 140)
-
-# The heartbeat trace, in the 256x256 coordinate system of icon.svg.
-TRACE = [
-    (36, 128), (84, 128), (98, 92), (116, 168),
-    (134, 110), (148, 140), (162, 128), (220, 128),
-]
-
-# The faint grid rules, in the 256x256 coordinate system of icon.svg. The rule
-# at y=128 is deliberately absent: it would lie along the flat part of the
-# heartbeat trace and swallow it, because a faint line drawn over a white line
-# is indistinguishable from a break in the trace.
-GRID_Y = (96, 160)
-GRID_X = (40, 216)
-
-TRACE_WIDTH = 11
-GRID_WIDTH = 3
 
 
-def lerp_colour(top, bottom, ratio):
-    """Interpolate between two RGB colours."""
-    return tuple(int(round(top[i] + (bottom[i] - top[i]) * ratio)) for i in range(3))
+def fetch(url):
+    """Return the bytes at url, honouring the usual proxy variables."""
+    proxies = {}
+    for key, value in (
+        ("https", os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")),
+        ("http", os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")),
+    ):
+        if value:
+            proxies[key] = value
 
-
-def rounded_gradient(size, radius, top, bottom):
-    """Return an RGBA image with a vertical gradient inside a rounded square."""
-    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    gradient = Image.new("RGBA", (size, size))
-
-    pixels = gradient.load()
-    for y in range(size):
-        colour = lerp_colour(top, bottom, y / float(size - 1))
-        for x in range(size):
-            pixels[x, y] = colour + (255,)
-
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        (0, 0, size - 1, size - 1), radius=radius, fill=255
-    )
-    image.paste(gradient, (0, 0), mask)
-    return image
-
-
-def scale_point(point, factor):
-    """Scale a point from the 256 unit coordinate system to the canvas."""
-    return (point[0] * factor, point[1] * factor)
-
-
-def draw_grid(draw, factor, size):
-    """Draw the faint horizontal rules of the dashboard grid."""
-    colour = (255, 255, 255, 46)
-    width = max(1, GRID_WIDTH * factor)
-    for y in GRID_Y:
-        draw.line(
-            [
-                (GRID_X[0] * factor, y * factor),
-                (GRID_X[1] * factor, y * factor),
-            ],
-            fill=colour,
-            width=width,
-        )
-
-
-def draw_trace(draw, factor):
-    """Draw the heartbeat trace.
-
-    The trace is a light stroke with a brighter core. Drawing it twice gives the
-    soft edge the SVG gets from its gradient without needing a real gradient
-    stroke, which Pillow cannot draw.
-    """
-    points = [scale_point(point, factor) for point in TRACE]
-
-    outer = max(1, TRACE_WIDTH * factor)
-    draw.line(points, fill=(255, 255, 255, 150), width=outer, joint="curve")
-
-    inner = max(1, int(TRACE_WIDTH * factor * 0.62))
-    draw.line(points, fill=(255, 255, 255, 255), width=inner, joint="curve")
-
-    # A round join at every vertex, so the corners of the trace match the
-    # stroke-linejoin="round" of the SVG rather than showing a mitre.
-    radius = outer / 2.0
-    for point in points:
-        draw.ellipse(
-            [
-                point[0] - radius, point[1] - radius,
-                point[0] + radius, point[1] + radius,
-            ],
-            fill=(255, 255, 255, 255),
-        )
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler(proxies))
+    request = urllib.request.Request(url, headers={
+        "User-Agent": "unraid-plugin-komari-agent-make-icon",
+    })
+    with opener.open(request, timeout=120) as response:
+        return response.read()
 
 
 def default_output():
@@ -139,21 +85,24 @@ def default_output():
 def main():
     out_path = sys.argv[1] if len(sys.argv) > 1 else default_output()
 
-    canvas = SIZE * SCALE
-    image = rounded_gradient(canvas, RADIUS * SCALE, TOP, BOTTOM)
-    draw = ImageDraw.Draw(image)
+    print("fetching %s" % SOURCE_URL)
+    data = fetch(SOURCE_URL)
+    if not data:
+        sys.exit("the server returned an empty body")
 
-    draw_grid(draw, SCALE, canvas)
-    draw_trace(draw, SCALE)
+    image = Image.open(io.BytesIO(data))
+    print("source: %s %s %s" % (image.format, image.size[0], image.size[1]))
+    image = image.convert("RGBA")
 
-    image = image.resize((SIZE, SIZE), Image.LANCZOS)
+    if image.size != (SIZE, SIZE):
+        image = image.resize((SIZE, SIZE), Image.LANCZOS)
 
     directory = os.path.dirname(os.path.abspath(out_path))
     if directory:
         os.makedirs(directory, exist_ok=True)
     image.save(out_path, format="PNG", optimize=True)
 
-    print("written", out_path)
+    print("written %s (%d bytes)" % (out_path, os.path.getsize(out_path)))
 
 
 if __name__ == "__main__":

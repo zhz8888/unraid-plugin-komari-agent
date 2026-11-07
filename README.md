@@ -530,7 +530,6 @@ need verification on a real Unraid host.
 ├── SECURITY.md
 ├── LICENSE                                # MIT (this project)
 ├── NOTICE                                 # MIT attribution for the bundled agent
-├── icon.svg                               # repository icon, used by Community Applications
 ├── ca_profile.xml                         # Community Applications repository profile
 ├── Makefile                               # build / lint / verify convenience targets
 ├── ca/

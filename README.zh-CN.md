@@ -472,7 +472,6 @@ pull request 里，而不是在 CI 期间悄悄发生。
 ├── SECURITY.md
 ├── LICENSE                                # MIT（本项目自身）
 ├── NOTICE                                 # 捆绑 agent 的 MIT 归属声明
-├── icon.svg                               # 仓库图标（CA 收录用）
 ├── ca_profile.xml                         # CA 仓库信息
 ├── Makefile                               # build / lint / verify 快捷命令
 ├── ca/

@@ -30,6 +30,19 @@ MIT License:
 A copy of the upstream license is available at:
   https://github.com/komari-monitor/komari-agent/blob/main/LICENSE
 
+The plugin icon is the Komari mascot, taken from the upstream web front end:
+
+  komari-web  (public/assets/pwa-icon.webp)
+  Source:         https://github.com/komari-monitor/komari-web
+  Pinned commit:  aa4e78bb40c2fc5569af065b7999a33e1bab1374
+  License:        MIT
+  Redistributed as: unraid-plugin-komari-agent.png (256x256, downscaled from
+                    the 512x512 upstream asset by scripts/make-icon.py)
+
+The artwork is unmodified apart from the downscale. It is used so that the
+Unraid Plugins tab shows the same mark as the Komari panel, which is what makes
+the plugin recognisable to someone who already runs Komari.
+
 The Komari panel server (komari-monitor/komari) is NOT distributed by this
 project. It is a separate application the user deploys, and it remains subject
 to its own license.
